@@ -5,6 +5,7 @@
 ## 数值与数据（跨领域前置）
 
 - [参数分层记录规范](data/parameter-record-schema.md) — **写任何硬件参数范围前必读**：L1 固件/L2 软件钳制/L3 实际稳定/L4 典型调校/L5 项目约定 · P
+- [实测数据证据记录规范](data/measurement-evidence-schema.md) — **写任何"本机实测/出厂/默认/实测数字"前必读**：来源七分类、设备状态分类、必填字段、回读语义、结论—证据映射 · P
 - [数值语义总则](data/numeric-semantics.md) — 有单位/无单位、原始值/工程值、有符号、百分比、物理量、位域、四层表示 · 混合
 - [单位与换算](data/units.md) — 电压/频率/功率/能量/时间/温度换算；RAPL 单位 1/2^n（非 2^n）、FMax 上限范围；CO 与 Intel 单位对照 · V/I
 - [序列化与持久化](data/serialization-persistence.md) — SchemaVersion、原子替换、多态、兼容性 · V

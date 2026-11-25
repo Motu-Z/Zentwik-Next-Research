@@ -9,7 +9,7 @@
 - **通道状态** — Available / NotSupported / DriverUnavailable / ProbeFailed 等，不可压成 bool → [lifecycle.md](architecture/lifecycle.md)、[amd-smu.md](hardware/cpu/amd-smu.md)
 - **CO（Curve Optimizer）** ⚠ — AMD 曲线优化器，**有符号步进档位，非 mV** → [amd-curve-optimizer.md](hardware/cpu/amd-curve-optimizer.md)
 - **CPU Sets** — Windows 软亲和性，优先级低于 affinity mask → [process-scheduling.md](windows/process-scheduling.md)
-- **Curve Shaper** — Zen 5 按频段×温段 5×3=15 点微调（Inferred），与 CO 是不同参数、不共用数值表 → [amd-curve-optimizer.md](hardware/cpu/amd-curve-optimizer.md)
+- **Curve Shaper** — Zen 5 按频段×温段 5×3=15 点微调（Verified：工具源码事实，非 AMD 官方协议），与 CO 是不同参数、不共用数值表 → [amd-curve-optimizer.md](hardware/cpu/amd-curve-optimizer.md)
 
 ## D–F
 
@@ -50,3 +50,11 @@
 ## 数值状态词（跨规范）
 
 Verified（已核实）· Inferred（有依据推断）· Proposed（Zentwik 建议/约定）· Unverified（未核实）· Deprecated（已废弃）。定义见 [README.md](README.md)。
+
+## 数据来源与设备状态词（实测记录，跨规范）
+
+数据来源七类：**User-provided**（用户提供，未独立复核）· **Direct observation**（有原始日志支持的直接观测）· **Reproduced**（可按步骤复现）· **Derived**（推导）· **Inferred**（推断）· **Example**（示例）· **Unknown**（来源不明）。
+
+设备状态：出厂 / BIOS 默认 / 当前 BIOS 配置 / 当前 SMU 状态 / 用户设置后 / 软件运行时修改后 / 重启后 / 恢复默认后 / 状态未知。
+
+> 读取到非零值 ≠ 出厂值；读取到零值 ≠ 默认状态；回读一致 ≠ 实际生效。定义与判定规则见 [measurement-evidence-schema.md](data/measurement-evidence-schema.md)。
