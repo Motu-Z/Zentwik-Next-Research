@@ -9,7 +9,7 @@
 - **通道状态** — Available / NotSupported / DriverUnavailable / ProbeFailed 等，不可压成 bool → [lifecycle.md](architecture/lifecycle.md)、[amd-smu.md](hardware/cpu/amd-smu.md)
 - **CO（Curve Optimizer）** ⚠ — AMD 曲线优化器，**有符号步进档位，非 mV** → [amd-curve-optimizer.md](hardware/cpu/amd-curve-optimizer.md)
 - **CPU Sets** — Windows 软亲和性，优先级低于 affinity mask → [process-scheduling.md](windows/process-scheduling.md)
-- **Curve Shaper** — Zen 5 按温度/频段分点微调，与 CO 不同 → [amd-curve-optimizer.md](hardware/cpu/amd-curve-optimizer.md)
+- **Curve Shaper** — Zen 5 按频段×温段 5×3=15 点微调（Inferred），与 CO 是不同参数、不共用数值表 → [amd-curve-optimizer.md](hardware/cpu/amd-curve-optimizer.md)
 
 ## D–F
 

@@ -17,7 +17,7 @@
 
 ## 硬件 · CPU（重点核验）
 
-- [AMD Curve Optimizer](hardware/cpu/amd-curve-optimizer.md) — **步进档位非 mV**；固件范围 -50…+50（正向多数 +30）、换算、误解、实测 · 混合
+- [AMD Curve Optimizer](hardware/cpu/amd-curve-optimizer.md) — **步进档位非 mV**；范围**不对称**（负向常见 −50、正向常见 +30），显示/工具/固件三层须区分；换算、误解、实测 · 混合
 - [Intel OC Mailbox](hardware/cpu/intel-oc-mailbox.md) — **11 位有符号 1/1024 V 定点、×1.024**；UVP、邮箱协议 · 混合
 - [AMD SMU 链路](hardware/cpu/amd-smu.md) — 邮箱命令号、核心掩码、世代绑定、权限、三态；**FMax Override -1000…+200 MHz / 25 MHz（上限非偏移）** · 混合
 
@@ -25,7 +25,7 @@
 
 - [传感器与采样率](hardware/sensors/README.md) — 数据面分档、双时钟、采样≠信息量 · V/I
 - [GPU 技术](hardware/gpu/README.md) — 待研究入口 · U
-- [内存技术](hardware/memory/README.md) — 待研究入口 · U
+- [内存技术](hardware/memory/README.md) — 待研究入口；DDR5 MT/s≠MHz、时序按周期数 = Verified，其余 · U
 
 ## Windows 系统
 

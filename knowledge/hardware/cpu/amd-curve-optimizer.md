@@ -20,8 +20,11 @@ Curve Optimizer 是 AMD 在支持 PBO 的 Ryzen 处理器上提供的一项调�
 
 ## 2. 适用范围
 
-- 硬件：支持 PBO 的 AMD Ryzen / Threadripper；CO 逐核设置通常在 Zen 2 及以后、经 AGESA/BIOS 暴露。具体可用性与范围由 CPU 型号、主板 BIOS 和 AGESA 决定（Verified：AMD FAQ 指出 PBO 需兼容型号与主板）。固件/AGESA 命令层一般约 -50…+50 档（负向通常可达 -50；正向多数 BIOS/Ryzen Master 只到 +30，部分工具到 +50），见第 5 节。
-- Zen 5 增加 Curve Shaper（按温度/频段分点微调），与 CO 并存但属于不同控制项（Verified：社区与 AMD Release Notes 曲线优化器自动测试描述）。
+- 硬件：支持 PBO 的 AMD Ryzen / Threadripper；CO 逐核设置通常在 Zen 2 及以后、经 AGESA/BIOS 暴露。具体可用性与范围由 CPU 型号、主板 BIOS 和 AGESA 决定（Verified：AMD FAQ 指出 PBO 需兼容型号与主板）。
+- **档位范围不对称，不能写成"±50 对称"**：AMD 官方未发布固件/AGESA 命令层的档位范围。观测到的负向常达 −50（个别平台 −60），正向通常更小（Ryzen Master 显示上限 +30）。显示上限、工具输入上限与固件/邮箱接受范围三者必须分开（见第 5 节分层记录）。
+- Zen 5 增加 Curve Shaper，与 CO 并存但属于**不同控制项、不同参数**，不得与 CO 共用数值表或单位约定（Verified 存在性：AMD Release Notes；结构细节见下）。
+  - 结构：**5 个频段 × 3 个温段 = 15 个可调点**，叠加在 CO 之上做分点微调（Inferred：多家社区资料与 SMU Debug Tool 说明文字一致；AMD 未发布官方命令/单位定义）。
+  - SMU Debug Tool 的 Curve Shaper 说明文字标注范围 −50…+30，但这是**该工具对 Curve Shaper 的表述**，既不是 CO 的范围，也未核验为 Zen5 固件范围（Unverified）。
 
 ## 3. 技术行为
 
@@ -45,9 +48,10 @@ Curve Optimizer 是 AMD 在支持 PBO 的 Ryzen 处理器上提供的一项调�
 
 | 层 | 取值 | 说明 / 来源 / 状态 |
 |---|---|---|
-| L1 固件/AGESA 实际允许 | 约 -50…+50 档（正向多数 BIOS/Ryzen Master 到 +30） | 多源工具链一致；AMD 官方未公开固件命令参数。Verified（范围本体）/ Inferred（正向 +30 的厂商差异） |
-| L2 软件输入钳制 | 旧版 Zentwik 输入侧 -50…+50 | `research/02` §2.3；`workbuddy-*` 工具实现选择，非固件事实。Verified |
-| L2 第三方工具上限 | SMUDebugTool ±999、G-Helper [-40,0] | 各工具源码/文档；软上限，非固件限制。Verified |
+| L1 固件/AGESA 实际允许 | **AMD 官方未发布**；观测负向常达 −50、正向多为 +30，二者不对称 | 固件接受范围无官方定义，只有工具/ BIOS 侧观测。**Inferred**（不得标为官方定义） |
+| L1 Ryzen Master **显示**上限 | +30 / −50 | MSI 官方 FAQ（FAQ-10122）：Ryzen Master 显示的 Core Value 限定在 +30/−50，但**实际可设定并应用超过该显示范围的值**。这是显示/呈现层钳制，**不等于固件或邮箱接受范围**。Verified（厂商文档） |
+| L2 软件输入钳制 | 旧版 Zentwik 输入侧 -50…+50 | `research/02` §2.3；本仓库实现选择，非固件事实。Verified |
+| L2 第三方工具上限 | SMUDebugTool CO 输入框 ±999；G-Helper [-40,0] | 各工具源码/文档；软上限，非固件限制。Verified（工具事实）。见下方"SMU Debug Tool 局限归属" |
 | L3 实际稳定可用 | 取决于 CPU 个体、散热、电压与负载 | 无通用数值，强核常只能 -5…−15，弱核可达更负。**Unverified，不填规范限制** |
 | L4 典型调校值 | 社区常见 -10…−30 起点 | **仅作参考，非规范限制、非官方推荐** |
 | L5 Zentwik 约定 | 字段 `coOffset`、类型 `CurveOffsetStep`（i8/i16）、单位 `step`、不持久化 mV | Proposed，见 §9 |
@@ -57,14 +61,23 @@ Curve Optimizer 是 AMD 在支持 PBO 的 Ryzen 处理器上提供的一项调�
 | 项 | 取值 | 核验状态 |
 |---|---|---|
 | 单位 | 档（step / count），**无单位**，不是 mV | Verified（社区与工具链一致；AMD 官方未发布单位定义，属外部事实缺失） |
-| 固件/AGESA 命令层档位范围 | 约 **-50 到 +50**（负向通常可达 -50；正向多数 BIOS/Ryzen Master 只到 +30，部分工具到 +50） | Verified（多源工具链一致：vectree.io、SMUDebugTool 源码、vgoodslab 的 -50 实操、本仓库旧代码钳制；AMD 官方 FAQ 不公布固件命令参数，故不标为官方定义）；正向 +30 上限因厂商而异 = Inferred |
-| 本仓库工具写入钳制范围 | -50 到 +50（旧代码输入侧钳制） | Verified（`research/02-hardware-access.md` §2.3）；该钳制**与固件常见档位范围一致**，不是工具凭空自创，也不是 AMD 官方公布值 |
-| 第三方工具软上限（非固件限制） | SMUDebugTool ±999、G-Helper [-40,0] | Verified（各工具源码/文档）；工具自身的保守或宽容上限，**不得当作固件事实** |
+| 固件/AGESA 命令层档位范围 | **未知**：AMD 公开文档无 MP1/CO 命令参数表，官方 FAQ 也不给档位边界 | **Inferred / Unverified**。多源工具链观测负向可到 −50、Ryzen Master 显示正向到 +30，但这些是显示/工具层观测，不能声称是 AMD 发布的固件范围 |
+| Ryzen Master 显示值域 | +30（正）/ −50（负），**显示钳制**，非固件上限 | Verified（MSI 官方 FAQ-10122，2026-11-25 访问）。厂商明确"实际可设定并应用超过 +30/−50 的值" → 显示范围 ≠ 固件范围 |
+| 本仓库工具写入钳制范围 | -50 到 +50（旧代码输入侧钳制） | Verified（`research/02-hardware-access.md` §2.3）；本仓库实现选择，不宣称等于固件范围 |
+| 第三方工具软上限（非固件限制） | SMUDebugTool CO 输入框 ±999（源码 literal，无命名常量）；G-Helper [-40,0] | Verified（工具源码/文档）；工具自身上限，**不得当作固件事实** |
 | 等效电压 | 社区经验约 3–5 mV/档，且随频率点非线性变化 | Inferred，**禁止作为官方事实或换算公式写入产品契约** |
 
-> **关键结论**：AMD 从未发布"每档 = N mV"的官方换算。3–5 mV/档是社区实测经验值，随平台、频率点、温度而变。**任何把 CO offset 标注为 mV 的行为都是错误。**
+**SMU Debug Tool 局限归属（本机实测，待区分来源）**：本机使用 SMU Debug Tool 实测 CO，**负向可设到 −50，正向只能到 +30**（Verified：本机实测，工具具体版本待补）。这是一个**不对称**范围，进一步说明 CO 不能描述为对称的 ±50。该 ±50/+30 界限的来源**尚未确定**，不得混为一谈：
+
+1. **不是该工具 CO 输入框的钳制**：源码 `SettingsForm.cs` 中 `numericUpDownCO_{i}` 的 `Minimum=-999 / Maximum=999`，Apply 路径无额外钳制（Verified：源码）。
+2. **−50…+30 在源码中出现在 Curve Shaper 说明文字**（`labelCsInfo`），而 Curve Shaper 是**另一个参数**（见下），不能拿来解释 CO 的 ±50/+30。
+3. 可能来自**固件/平台对该邮箱命令的接受范围**，也可能来自**该工具版本在写入侧的额外钳制**。二者需要分别验证：先用本仓库写入链路直接向 SMU 发 SetMargin，测试 +31…+50 是否被接受并回读一致（工具无关），再对照同机同工具的输入框行为。来源定性前标 **Unverified**。
+
+> **关键结论 1**：AMD 从未发布"每档 = N mV"的官方换算。3–5 mV/档是社区实测经验值，随平台、频率点、温度而变。**任何把 CO offset 标注为 mV 的行为都是错误。**
 >
-> **易混淆点（务必区分两个维度）**：**档位范围**（约 -50…+50）是离散的计数值范围，回答"能设多少档"；**每档 mV 等效**不存在官方固定值，回答"每档值多少电压"。前者是固件/BIOS 允许的档数，后者是无官方定义的经验换算——不要把"-50 档"误读成"-50 mV"。
+> **关键结论 2**：CO **档位范围不对称**，不能写成对称的 "±50"。AMD 从未发布固件命令层的档位范围；Ryzen Master 的 +30/−50 是**显示钳制**（MSI FAQ-10122 明确实际可设定并应用超出该范围的值），第三方工具的输入上限（±999、[-40,0]）是**工具选择**。把显示/工具范围当成固件范围，或把负向与正向说成对称，都是错误。
+>
+> **易混淆点（务必区分三个维度）**：**档位范围**（负向常见 −50、正向常见 +30，不对称）是离散计数值，回答"能设多少档"；**每档 mV 等效**无官方固定值，回答"每档多少电压"；**显示/工具钳制**只是呈现或输入层限制，不是固件上限。三者互不替代，更不要把"−50 档"误读成"−50 mV"。
 
 ## 6. 转换规则
 
@@ -86,6 +99,9 @@ PBO、PPT、TDC、EDC、Precision Boost、V/F curve、Curve Shaper、SMU Mailbox
 | "所有核都必须能读写" | 本平台 bit23 对应核被邮箱拒绝，属部分可用 | Verified 实测，`research/02` §11 |
 | "命令号与固件无关，可全平台通用" | 命令号与 CPU 世代/型号强绑定；家族白名单误分类会发错世代命令 | Verified，`research/02` §2.2/§10 |
 | "回读相同即写入成功" | 这是必要条件；仍需观测效果层（频率/功耗/温度）以排除钳位 | Inferred，`research/02` §8.3 |
+| "CO 是 ±50 对称范围" | 不对称：负向常见 −50、正向常见 +30；且这些是工具/显示观测，非 AMD 发布的固件范围 | Verified（本机实测 + MSI FAQ），见 §5 |
+| "Ryzen Master 显示到 +30/−50 就是固件上限" | 显示钳制 ≠ 固件上限；MSI FAQ 明确实际可设定并应用超出显示范围的值 | Verified（MSI FAQ-10122） |
+| "SMU Debug Tool 的 −50…+30 来自 CO 输入框" | 该工具 CO 输入框是 ±999；−50…+30 出现在 Curve Shaper 说明，属另一参数 | Verified（工具源码） |
 
 ## 9. Zentwik 内部约定（Proposed）
 
@@ -101,9 +117,12 @@ PBO、PPT、TDC、EDC、Precision Boost、V/F curve、Curve Shaper、SMU Mailbox
 | 来源 | 类型 | 访问状态 | 用途 |
 |---|---|---|---|
 | AMD Ryzen Master 产品页 / Release Notes | 官方 | 已访问 2026-11-25 | CO/PBO 特性存在性、参数调整方式 |
+| MSI FAQ-10122（Curve Optimizer Magnitude vs Ryzen Master 显示） | 厂商官方 FAQ | 已访问 2026-11-25 | Ryzen Master 显示钳制 +30/−50，实际可设定并应用超出该范围；证明显示范围 ≠ 固件范围 |
+| AMD FAQ — Curve Optimizer Feature in Ryzen Master（Build 2.9.0.2093） | 官方 PDF | 已访问 2026-11-25 | CO 定义、All Core/Per Core、验证方式；官方 FAQ 未给固件档位边界 |
+| SMU Debug Tool 源码 `SettingsForm.cs`（irusanov 仓库镜像） | 维护者源码 | 已访问 2026-11-25 | CO 输入框 ±999（无命名常量）；−50…+30 出现在 Curve Shaper 说明文字 |
 | AMD PPR | 官方 | 公开版本不含 MP1 消息表 | 不能用于证明命令号 |
 | RyzenSMU.p / RyzenAdj 上游源码 | 维护者源码 | 经本仓库研究引用 | 邮箱与命令号口径 |
-| vectree.io（Zen5 CO/Curve Shaper 分析） | 专业社区 | 已访问 2026-11-25 | 固件/BIOS 档位范围：老 Zen3/早 Zen4 停 -30，当前 AGESA 常达 -50 |
+| vectree.io（Zen5 CO/Curve Shaper 分析） | 专业社区 | 已访问 2026-11-25 | BIOS 侧观测：老 Zen3/早 Zen4 停 -30，当前 AGESA 常见 −50；仅为工具/BIOS 侧观测，非官方固件范围（Inferred） |
 | SMUDebugTool / DeepWiki 源码索引、G-Helper 文档 | 维护者源码/文档 | 已访问 2026-11-25 | 第三方工具软上限 ±999 / [-40,0]（非固件限制） |
 | SkatterBencher 等社区分析 | 专业社区 | 二手线索 | 3–5 mV/档经验值（Inferred） |
 | `research/02-hardware-access.md` §2/§11 | 本仓库一手实测 | 已核验 | 命令号、掩码、实测纠错、输入侧 ±50 钳制 |
@@ -113,6 +132,8 @@ PBO、PPT、TDC、EDC、Precision Boost、V/F curve、Curve Shaper、SMU Mailbox
 - bit23 在 Ryzen 9 9955HX 上被拒的根因（独热位编码差异 vs 该平台不接受该 bit），需一次完整掩码扫描确认。
 - Zen5 / Hawk Point / Dragon Range 的家族白名单误分类是否已在新版模块中修复。
 - S3/S4 恢复后 CO 是否丢失。
+- **本机 SMU Debug Tool 的 −50/+30 界限来源**：工具无关直写测试 +31…+50 是否被 SMU 接受并回读一致；补记工具准确版本。来源定性前保持 Unverified。
+- **Curve Shaper 的档位范围与命令号**：本仓库仅确认其存在与 5 频段×3 温段结构（社区来源，Inferred），未核验其独立命令号与官方单位定义，不得与 CO 的数值表混用。
 
 ## 12. 核验状态分项
 
@@ -120,8 +141,10 @@ PBO、PPT、TDC、EDC、Precision Boost、V/F curve、Curve Shaper、SMU Mailbox
 |---|---|
 | CO 存在、属 PBO、可逐核、可通过 BIOS/Ryzen Master 调整 | Verified |
 | CO 是步进档位而非 mV | Verified（工具链一致 + 本仓库纠错） |
-| 固件/BIOS 常见档位范围 -50…+50（正向多数 BIOS 到 +30） | Verified（多源工具链一致；AMD 官方未公开固件命令参数） |
-| 第三方工具软上限 ±999 / [-40,0] | Verified（工具事实，非固件限制） |
+| 固件/AGESA 命令层档位范围 | **Unverified / 官方未发布**；负向常见 −50、正向常见 +30 为工具/显示观测，非官方固件范围 |
+| Ryzen Master 显示钳制 +30/−50，实际可超过 | Verified（MSI FAQ-10122 厂商文档） |
+| 第三方工具软上限 ±999 / [-40,0]；−50…+30 属 Curve Shaper | Verified（工具事实/源码，非固件限制） |
+| 本机 SMU Debug Tool 实测 CO 负向 −50、正向 +30，不对称 | Verified 实测（本机，工具版本待补）；**来源（工具/固件/平台）Unverified** |
 | 每档约 3–5 mV（经验，非线性） | Inferred，禁止当官方公式 |
 | SMU 命令号 0x06/0xD5、核心掩码编码 | Verified（本仓库实测）/ Inferred（协议来源） |
 | 出厂可能为非零偏移、bit23 部分核被拒 | Verified 实测（本机） |
