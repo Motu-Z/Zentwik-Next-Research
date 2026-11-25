@@ -6,7 +6,7 @@
 旧项目：https://github.com/Motu-Z/Zentwik
 
 ## 1. 阅读基线
-先读 README.md、PROJECT_BRIEF.md、ARCHITECTURE_CONSTRAINTS.md、RESEARCH_PLAN.md 和 templates/RESEARCH_REPORT.md。
+先读 README.md、AI_GUIDE.md、knowledge/INDEX.md，以及 project/PROJECT_BRIEF.md、project/ARCHITECTURE_CONSTRAINTS.md、project/RESEARCH_PLAN.md 和 templates/RESEARCH_REPORT.md。技术事实与单位问题按 AI_GUIDE 的检索流程查 knowledge/。
 
 随后检查旧项目的实际内容，确认默认分支、相关版本/提交、目录结构，以及 CPU 调校、AMD、Intel、电源、调度、监控、自动化和模块系统的实现状态。历史报告不能代替当前源码事实；冲突时以当前源码和可复现实验为准。无法访问时明确说明，不得虚构。
 
@@ -88,7 +88,7 @@
 - 不扫描磁盘，不猜测本地绝对路径，不把研究仓库与产品源码仓库混为一谈。
 
 ### 立即执行，不再重复预研
-1. 快速读取研究仓库现有基线与已完成报告，尤其 PROJECT_BRIEF、ARCHITECTURE_CONSTRAINTS、RESEARCH_PLAN、RESEARCH_EFFICIENCY、已有 ADR 和阶段报告。只读与当前决策有关的内容，不重新做完整盘点。
+1. 快速读取研究仓库现有基线与已完成报告，尤其 project/PROJECT_BRIEF、project/ARCHITECTURE_CONSTRAINTS、project/RESEARCH_PLAN、knowledge/INDEX、research/RESEARCH_EFFICIENCY、已有 ADR 和阶段报告。只读与当前决策有关的内容，不重新做完整盘点。
 2. 对旧项目只做定点检索，补齐启动新项目必需的事实。已有报告可复用；仅当源码明显与报告冲突或影响新架构决策时才复核。
 3. 对尚未解决的技术选择采用“暂定决策 + 可替换边界”：列出假设、风险和验证计划，然后继续搭建，不得因所有技术问题尚未完全确定而停工。
 4. 先建立最小但真实的新项目骨架：构建/运行入口、目录结构、核心领域边界、配置与本地化基础、日志与诊断、测试入口、架构说明。骨架必须能构建或运行；不要只创建空目录和占位文档。
