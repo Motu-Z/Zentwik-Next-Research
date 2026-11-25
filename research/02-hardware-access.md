@@ -271,3 +271,14 @@ SmuReader(门面/状态机)  →  SmuSession(命令语义)  →  SmuChannel(ioct
 - 旧代码称 SMU 命令号"与固件版本无关"，但 CO 命令按家族分叉、FMax 在部分移动平台不实现——**命令号与固件无直接绑定，但与平台/世代强绑定**。
 - 旧代码称能通过 HRESULT 区分"SMU 拒绝"与"命令不存在"，实现只保留 Win32 错误码，能力被削弱。
 - 功耗限制"曾实现后移除"没有留下理由，不能据此推断"技术上不可行"。
+
+---
+
+## 11. 实测补充（2026-11-25，Ryzen 9 9955HX / 服务以 SYSTEM 运行）
+
+- **SYSTEM 令牌可以打开 PawnIO 设备**：`ZentwikAgent` 服务加载 `RyzenSMU.bin` 成功，SMU 测试消息 `0x01` 回 `2`、`ioctl_get_smu_version` 正常返回。此前"管理员 vs SYSTEM 的 ACL 行为未验证"一项，对 SYSTEM 成立。
+- **Fire Range 被模块当作 Granite Ridge**：`RyzenSMU.p` 的 `get_code_name` 把 `(1Ah<<8)|44h` 映射为 `CPU_GraniteRidge`，因此邮箱寄存器组是 `cmd 0x3B10524 / rsp 0x3B10570 / args 0x3B10A40`（与桌面 Zen4/5 同组）。这说明读 CO 的 `0xD5` 走的是 RSMU 邮箱，与工具链口径一致。
+- **`0xD5` 被 SMU 拒绝**：`tuning` 以掩码 `0x00000000`（核 0，序号编码）读 CO，模块返回 `STATUS_UNSUCCESSFUL` → Win32 31。按 `smu_status_to_nt` 反推，SMU 应答是 `0xFF`（`SMU_Failed`），不是 `0xFE`（未知命令，会得到 87）。即邮箱通、命令被拒。
+- **待判定**：拒绝原因是"核地址编码不对（0x00100000 独热位才是核 0）"还是"移动平台固件锁定 CO"。已改为探测阶段自动协商两种编码；两种都失败才判 `Rejected`，并把每次尝试的掩码与错误码写进明细。
+- **`0x1AD` 的第二组**：`IntelMSR.p` 白名单包含 `0x150`、`0x1AD`、`0x650`、`0x1A4`，写入只对这些地址开放；在 AMD 机器上模块 `main()` 直接返回 `STATUS_NOT_SUPPORTED`（Win32 50），无法实测。
+- **Intel 通道已实现、未上机**：`IntelMsrTuningProvider` 读 `0x150`（11 位有符号、1/1024 V）与 `0x1AD`（1C/8C 倍频），电压偏移写入后回读比对；位域编解码有单测，真机行为待 Intel 机器验证。

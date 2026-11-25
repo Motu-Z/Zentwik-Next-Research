@@ -23,7 +23,8 @@ Zentwik Next 的产品重定义、技术预研、架构决策与原型验证工�
 - `decisions/ADR-001..007` 技术栈、UI、进程、协议、方案与所有权、持久化、CLI 契约
 - `research/handoffs/M1-2026-11-25.md` M1 交接（骨架与纵向切片）
 - `research/handoffs/M2-2026-11-25.md` M2 交接（CLI、服务化、硬件通道）
-- `research/handoffs/M3-2026-11-25.md` 当前交接（IPC 拒绝、服务恢复动作、场景退出回退、界面可访问性实测）
+- `research/handoffs/M3-2026-11-25.md` M3 交接（IPC 拒绝、服务恢复动作、场景退出回退、界面可访问性实测）
+- `research/02-hardware-access.md` §11 硬件实测补充（SYSTEM 可开 PawnIO、`0xD5` 被 SMU 拒绝、Intel MSR 白名单）
 - 产品代码：`D:\Projects\Zentwik Next`（README 含构建、运行、命令面与退出码）
 
 ## 核心原则
