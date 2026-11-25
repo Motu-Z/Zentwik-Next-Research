@@ -8,6 +8,7 @@
 - 第二轮复审：2026-11-25（承接首轮，聚焦首轮未发现的错误与用户新增实测证据）
 - 第三轮专项审计：2026-11-25（实测数据真实性 + 外部研究质量，见 §6）
 - 第四轮专项审计：2026-11-25（实现错误误归因平台：bit23/核心掩码，见 §7）
+- 第五轮知识完善：2026-11-25（成熟实现参考：APOB 映射/CO 编码/命令分派，见 §8）
 - 第三轮专项审计：2026-11-25（用户设备实测数据真实性 + 外部资料研究质量；优先级高于新增知识）
 
 ## 1. 审计发现与处理（首轮）
@@ -163,3 +164,46 @@
 当观测到的失败可用"本方实现与外部权威实现不一致"解释时，**禁止写成平台/固件限制**；先做实现对齐，再讨论硬件能力。此规则与第三轮"读取值不足以证明默认状态"并列，构成本项目防误归因的两条核心约束。
 
 本轮未修改旧版产品 `main`，未触碰产品仓库，未 force push；核心掩码的权威定义只维护在 `amd-smu.md` §3.1，其余文档引用。
+
+---
+
+## 8. 第五轮知识完善（2026-11-25）——成熟实现参考：APOB / CO 编码 / 命令分派
+
+本轮定位为**建设性**：建立可靠技术事实与成熟实现参考，重点为 AMD CO/APOB。方法与证据规则不变（逐行打开上游源码，非 README/搜索摘要）。
+
+### 8.1 本轮实际访问并逐行核对的上游源码
+
+| 资料 | 定位 | 支持的结论 |
+|---|---|---|
+| `irusanov/ZenStates-Core`（dev）`Hardware/Apob/ApobCoreMap.cs`（526 行全文） | 类注释、`ApobCoreMapCore`、`ApobCoreMap.GetLogicalCore/GetPhysicalCoreMask`、`ApobCoreMapParser.Parse/Decode/TryDecode` | APOB 逻辑→物理映射结构、跳过禁用核（NOT_PRESENT=0xFF）、优先 CCD 映射(type3)后 CCX(type1)、布局从 entry 大小推导并用 expectedThreads 打分 |
+| 同上 `Cpu.cs::MakeCoreMask` / `MakeCoreMaskForLogicalCore`；`SMUDebugTool SettingsForm.cs:2562-2584` | 逐字函数体 | CO 掩码完整链路：APOB→物理 ccd/ccx/core→`(ccd<<28)\|((core%8)<<20)`；两处独立源码一致 |
+| 同上 `Utils.cs:178-197`（`MakePsmMarginArg`/`CurveOptimizerToVid`）、`SetPsmMarginSingleCore.cs`、`GetPsmMarginSingleCore.cs`、`SetPsmMarginAllCores.cs`（全文） | 逐行 | margin 16 位补码编码、全核/逐核为不同命令、回读三路分派（RSMU count / GBV 浮点 / legacy VID）、世代范围注释（Zen4 前 ±30、Zen4+ ±50）、3.0 mV/count |
+| 同上 `Hardware/Smu/Settings/Zen4Settings.cs`、`Zen5Settings.cs`、`SetCurveShaperMargin.cs`、`GetCurveShaperMargin.cs` | 逐行 | Zen4/5 命令号：逐核 0x06/全核 0x07(MP1 0x35/0x36)、Curve Shaper 0xA6/0x84、寄存器组地址；Curve Shaper 参数编码与 [−50,+30] 钳制 |
+| `FlyGoat/RyzenAdj`（master）`lib/api.c:1404-1479`、`:439-452`、`lib/ryzenadj.h:17-34` | 逐行 | 按 CPU 家族分派 CO 命令号；FireRange/DragonRange 逐核 0x06/全核 0x07 交叉印证；`REP_MSG_UnknownCmd` 区分"命令不支持"与"被拒"；Strix Halo 0xB7 被拒 |
+| Linux kernel `arch/x86/include/asm/msr-index.h` | 逐字 | RAPL `0x606/0x610/0x611`；**无** `MSR_IA32_OC_MAILBOX`（佐证 OC Mailbox 非架构） |
+
+未逐行打开（故不作为新结论来源）：AMD Ryzen Master（闭源）、UXTU、LibreHardwareMonitor 的 CO 路径。已如实说明，未声称核验。
+
+### 8.2 发现并修正的问题
+
+| # | 位置 | 问题 | 性质 | 处理 |
+|---|---|---|---|---|
+| 17 | `intel-oc-mailbox.md` §12 | "11 位 S11.0.10 / 1/1024 V / ×1.024"标 Verified，与 §4 第三轮审计结论（社区逆向、只能 Inferred）**自相矛盾** | 证据等级错误（未同步） | §12 改为 Inferred 并注明"此前误标，此处更正" |
+| 18 | `amd-smu.md` §3.1、`amd-curve-optimizer.md` §6 | 写入参数"低 16 位 vs 低 20 位"位数歧义标"需实机确认" | 数值/位域语义未决 | 本轮源码确认：掩码高 12 位 + margin 低 16 位补码 + [19:16] 保留；更新两处，标 Verified 源码事实 |
+| 19 | `amd-curve-optimizer.md` §11 | Curve Shaper 命令号此前列 Unverified | 待核验项已有外部证据 | 本轮源码确认 Zen4/5 `0xA6`/`0x84` 与编码，升级为 Verified 工具事实（官方协议仍 Inferred） |
+
+### 8.3 新增/完善的技术参考
+
+- 新增 [implementation-references.md](hardware/cpu/implementation-references.md)：APOB 定义/结构/完整掩码链路、CO 全核与逐核命令差异、16 位补码编码、回读多世代分派（count/GBV/legacy VID）、响应三态、按家族命令号对照表、世代范围与 Curve Shaper 钳制、已知限制（Strix Halo 0xB7 被拒等）。明确定位为**实现参考，非规范**。
+- `amd-smu.md` §3 命令号表补 Zen4/5 全核/Curve Shaper 命令号；§3.1 写入参数位数确认。
+- `amd-curve-optimizer.md` §2 补 Curve Shaper 命令号/编码；§6 写入编码；§12 核验状态补 3 项。
+- `intel-oc-mailbox.md` §12 更正证据等级 + 补 RAPL MSR 地址 Verified（kernel 源码）。
+- INDEX / hardware/README / GLOSSARY / AI_GUIDE 挂载新参考文档与使用规则。
+
+### 8.4 仍未确认（不伪造）
+
+1. APOB 映射在本仓库目标平台（9955HX / Fire Range）是否可读、布局维度——无硬件、无原始 APOB dump，Unverified。
+2. 修正编码 + APOB 映射后 16 核是否全可写——用户报告"其他工具可改全核" = User-provided，未独立复核。
+3. SMU Debug Tool −50/+30 界限来源、各命令号在具体 SKU+AGESA 的真实有效性——需逐平台回读矩阵。
+
+本轮未修改旧版产品 `main`，未触碰产品仓库，未 force push；参数权威定义仍只在基础规范，新参考文档不重复维护数值表。

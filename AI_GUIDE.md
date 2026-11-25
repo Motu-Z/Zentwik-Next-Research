@@ -23,7 +23,8 @@
 5. **涉及外部 API/寄存器/硬件行为**：核对规范中列出的官方来源，并（在资料过期或冲突时）复核官方文档章节。Verified 必须是**实际打开原始资料并定位到具体章节/字段/代码行**；搜索摘要、二手转述、其他 AI 生成内容不得标 Verified。
 6. **区分事实、推断与项目约定**：每份规范标注了 Verified / Inferred / Proposed / Unverified / Deprecated，并区分外部技术事实（A）与项目内部约定（B）。产出时保持这种区分。
    - **涉及本机实测/出厂/默认/任何实测数字**：先读 `knowledge/data/measurement-evidence-schema.md`。每条数据必须标注来源七类之一（User-provided / Direct observation / Reproduced / Derived / Inferred / Example / Unknown）与读取时的设备状态。**不得默认用户设备处于出厂状态，不得把用户自设参数当固件默认，不得把 Derived/Inferred/Example/Unknown 改写为实测事实，不得把 User-provided 升格为 Direct observation。** 没有原始日志就写"来源 Unknown/原始日志缺失"，不得编造实验过程。
-7. **查证据与历史**：需要原始实验数据、论证过程或交接背景时读 `research/`；需要"为什么这么决定"时读 `decisions/`。
+7. **查成熟实现**：需要了解"工具实际怎么做、如何处理硬件/固件差异与边界"时读 `knowledge/hardware/cpu/implementation-references.md`（APOB/掩码/命令分派/响应三态等）。**它是实现参考，不是权威规范、不是硬件事实、不是 Zentwik 契约**：上游源码的行为只说明"该工具在该版本这样实现"，不得据此升格为官方规范或把工具限制写成硬件限制；参数权威定义仍以基础规范为准。
+8. **查证据与历史**：需要原始实验数据、论证过程或交接背景时读 `research/`；需要"为什么这么决定"时读 `decisions/`。
 
 ## 3. 冲突处理
 

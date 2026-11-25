@@ -39,6 +39,7 @@
 - **场景（Scene）** ⚠ — 跨领域协调机制，**不是第四种方案** → [scenes-arbitration.md](domain/scenes-arbitration.md)
 - **SchemaVersion** — 文档版本；高于支持版本时拒绝加载并保留原文件 → [serialization-persistence.md](data/serialization-persistence.md)
 - **SMU** — AMD 系统管理单元，CO/FMax 经邮箱访问 → [amd-smu.md](hardware/cpu/amd-smu.md)
+- **APOB（核心映射）** — AGESA 启动阶段留下的逻辑核→物理 CCD/CCX/Core 映射，CO 掩码应据此生成、跳过禁用核 → [implementation-references.md](hardware/cpu/implementation-references.md) §2
 - **状态所有权（Owner）** — Scene/Plan/User/System；用户接管优先于自动恢复 → [state-ownership.md](domain/state-ownership.md)
 - **步进量** ⚠ — 无量纲档位，无可靠 mV 换算 → [amd-curve-optimizer.md](hardware/cpu/amd-curve-optimizer.md)
 

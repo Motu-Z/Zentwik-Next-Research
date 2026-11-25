@@ -120,9 +120,11 @@ MSR、IA32_OC_MAILBOX (0x150)、电压平面（IA Core / GT / Cache）、Undervo
 | 结论 | 状态 |
 |---|---|
 | 寄存器号 0x150、邮箱协议、busy 位、命令字高 32 位 | Verified |
-| 11 位有符号 S11.0.10、单位 1/1024 V、×1.024 换算 | Verified |
+| 11 位有符号 S11.0.10、单位 1/1024 V、×1.024 换算 | **Inferred（社区逆向口径，多源一致但非官方规范）**——与 §4 第三轮审计结论一致；此前本表误标 Verified，此处更正 |
 | Intel 无公开 OC Mailbox 命令文档 | Verified（官方维护者声明） |
 | UVP + VBS/HVCI 下运行时降压不可用 | Verified（Intel 官方文档） |
 | 本仓库代码位域编解码 | Verified（单测）；真机行为 Unverified |
+| RAPL MSR 地址 0x606/0x610/0x611 | Verified（Linux kernel `msr-index.h` 本轮逐字核对）；单位公式见 [units.md](../../data/units.md) |
+| OC Mailbox 0x150 不在 kernel msr-index.h | Verified（本轮核对，佐证非架构接口） |
 | 命令字/域位跨世代通用性 | Inferred，须真实平台回读交叉验证 |
 | 锁定状态回读行为 | Unverified |

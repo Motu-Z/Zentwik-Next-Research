@@ -11,7 +11,7 @@
   - 社区与维护者资料：SkatterBencher（每档约 3–5 mV 的经验换算）、RyzenAdj / RyzenSMU.p 上游源码、laptopjudge 技术整理
   - 本仓库研究记录（原标"一手实测"，原始日志缺失、来源 Unknown，见第三轮审计）：`research/02-hardware-access.md` §2、§11
   - 实测记录字段与来源分类规范：[measurement-evidence-schema.md](../../data/measurement-evidence-schema.md)
-- 相关文档：[numeric-semantics.md](../../data/numeric-semantics.md)、[units.md](../../data/units.md)、[amd-smu.md](amd-smu.md)、[intel-oc-mailbox.md](intel-oc-mailbox.md)
+- 相关文档：[numeric-semantics.md](../../data/numeric-semantics.md)、[units.md](../../data/units.md)、[amd-smu.md](amd-smu.md)、[intel-oc-mailbox.md](intel-oc-mailbox.md)、[implementation-references.md](implementation-references.md)（成熟工具怎么做 APOB/掩码/命令分派，实现参考非规范）
 
 ## 1. 准确定义（外部技术事实）
 
@@ -26,6 +26,7 @@ Curve Optimizer 是 AMD 在支持 PBO 的 Ryzen 处理器上提供的一项调�
 - Zen 5 增加 Curve Shaper，与 CO 并存但属于**不同控制项、不同参数**，不得与 CO 共用数值表或单位约定（Verified 存在性：AMD Release Notes；结构细节见下）。
   - 结构：**5 个频段 × 3 个温段 = 15 个可调点**，叠加在 CO 之上做分点微调（Verified：SMU Debug Tool 源码 `SettingsForm.cs:352-365` 的 `CsTierNames` 5 项、`CsBandNames` 3 项、`CsControls[5,3]`；这是**工具源码事实**，AMD 未发布官方命令/单位定义）。
   - SMU Debug Tool 的 Curve Shaper 说明文字标注范围 −50…+30，但这是**该工具对 Curve Shaper 的表述**，既不是 CO 的范围，也未核验为 Zen5 固件范围（Unverified）。
+  - 命令号与编码（**Verified 上游源码事实**，`irusanov/ZenStates-Core` `Zen4Settings.cs` / `SetCurveShaperMargin.cs`，本轮逐行核对）：Zen4/5 RSMU `SetCurveShaperMargin=0xA6`、`GetCurveShaperMargin=0x84`；写入参数 `marginHigh<<24 | marginMedium<<16 | marginLow<<8 | (1<<7) | frequencyTier&0x7F`，`frequencyTier` 限 0–4；`EncodeMargin` 把每个 margin 钳到 [−50,+30] 并存为 `sbyte`。**这正是 SMU Debug Tool 说明文字"−50…+30"的源码级来源——它是 Curve Shaper 的钳制，不是 CO 范围**。作为 Zen5 官方固件协议仍为 Inferred（AMD 未公开）。详见 [implementation-references.md](implementation-references.md) §2/§3.6。
 
 ## 3. 技术行为
 
@@ -82,7 +83,7 @@ Curve Optimizer 是 AMD 在支持 PBO 的 Ryzen 处理器上提供的一项调�
 
 ## 6. 转换规则
 
-- 正确的换算只有一种方向在项目中被允许：**步进值 → 写入参数**（`(coreMask & 0xFFF00000) | (step as int16)`），由 provider 完成（掩码公式来源于本仓库旧实现记录，来源类别 Unknown/原始日志缺失；公式语义 = Derived）。
+- 正确的换算只有一种方向在项目中被允许：**步进值 → 写入参数**，由 provider 完成。权威编码（**Verified 上游源码**，`ZenStates-Core` `Utils.cs:180-184` / `SetPsmMarginSingleCore.cs`）：`margin16 = margin<0 ? (0x100000+margin)&0xffff : margin`，`args[0] = (coreMask & 0xfff00000) | margin16`。即**掩码占高 12 位、margin 占低 16 位（16 位补码）、[19:16] 保留**；本轮源码确认此前"低 16 位 vs 低 20 位"歧义（见 [implementation-references.md](implementation-references.md) §3.2）。作为芯片硬件协议仍为 Inferred（AMD 未公开）。
 - **禁止**提供 `Step → mV` 的确定性转换函数。若 UI 需要示意，只能标注为"约 3–5 mV/档，仅供参考，非官方换算"（Inferred）。
 - 符号：负值为降压（undervolt），正值为加压。补码负值在写入低 16 位时必须保持符号扩展正确。
 
@@ -135,7 +136,7 @@ PBO、PPT、TDC、EDC、Precision Boost、V/F curve、Curve Shaper、SMU Mailbox
 - Zen5 / Hawk Point / Dragon Range 的家族白名单误分类是否已在新版模块中修复。
 - S3/S4 恢复后 CO 是否丢失。
 - **本机 SMU Debug Tool 的 −50/+30 界限来源**：工具无关直写测试 +31…+50 是否被 SMU 接受并回读一致；补记工具准确版本。来源定性前保持 Unverified。
-- **Curve Shaper 的档位范围与命令号**：结构 5×3=15 点已由工具源码逐行确认（Verified 工具事实，`SettingsForm.cs:352-365`）；但其独立命令号、官方单位定义与 Zen5 固件档位范围仍未核验（Unverified），不得与 CO 的数值表混用。
+- **Curve Shaper 固件协议**：5×3=15 点结构、命令号（Zen4/5 `0xA6`/`0x84`）与参数编码已由上游源码逐行确认（Verified 工具事实，见 §2 与 [implementation-references.md](implementation-references.md)）；但**官方单位定义与 Zen5 固件档位范围仍无 AMD 公开资料**（Unverified/Inferred 作为官方事实），不得与 CO 的数值表混用。
 
 ## 12. 核验状态分项
 
@@ -150,6 +151,9 @@ PBO、PPT、TDC、EDC、Precision Boost、V/F curve、Curve Shaper、SMU Mailbox
 | 每档约 3–5 mV（经验，非线性） | Inferred，禁止当官方公式 |
 | SMU 命令号 0x06/0xD5 | Inferred（逆向协议口径）；本仓库曾报告写入/回读过程但原始日志缺失、来源 Unknown |
 | 核心掩码编码 `[23:20]` 为 4 位核内序号、非独热位 | **Verified（外部源码逐字核对，见 [amd-smu.md](amd-smu.md) §3.1）** |
+| CO 写入参数 = 掩码高 12 位 + 16 位补码 margin；全核/逐核为不同命令 | **Verified 上游源码**（[implementation-references.md](implementation-references.md) §3.1/§3.2）；作为硬件协议 Inferred |
+| Curve Shaper 命令号 Zen4/5 `0xA6`/`0x84`、5 频段、margin 钳 [−50,+30] | **Verified 工具源码**（本轮逐行核对）；作为 Zen5 官方固件协议 Inferred |
+| 世代 CO 范围注释（Zen4 前 ±30 / Zen4+ ±50） | Verified 源码注释存在 / Inferred 作为官方事实（AMD 未发布） |
 | "出厂可能为非零偏移（本仓库 14 核 -11…-26）" | **已撤回 / Unknown**：无原始数据、状态混淆（同会话有写入），见 `research/02` §11 第三轮审计注记。仅保留"读到 0 ≠ 默认状态"为逻辑结论 |
 | "bit23 部分核被平台拒绝" | **已撤回**：源于旧实现独热位编码错误（Verified 源码比对），非平台限制；用户报告其他工具可改全核 = User-provided（未附日志/工具版本）。修正编码后的实机结果 Unverified |
 | 休眠恢复清回出厂的假设 | Unverified |

@@ -32,6 +32,8 @@ SmuReader（门面/状态机）→ SmuSession（命令语义）→ SmuChannel（
 | 0x19 | Zen4 | 0x06 | 0xD5 | 0x6E | 0x70 |
 | 0x1A | Zen5 | 0x06 | 0xD5 | 0x6E | 0x70 |
 
+Zen4/5 补充命令号（**Verified 上游源码** `Zen4Settings.cs`，本轮逐行核对；作为硬件协议 Inferred）：全核 CO `SetAllDldoPsmMargin` = RSMU `0x07` / MP1 `0x36`；逐核 MP1 侧 `SetDldoPsmMargin=0x35`；Curve Shaper `Set=0xA6` / `Get=0x84`。RyzenAdj 对 FireRange/DragonRange 的逐核 `0x06` / 全核 `0x07` 独立交叉印证。按家族分派的完整对照见 [implementation-references.md](implementation-references.md) §4。
+
 - 命令号来自逆向工具链口径，AMD 公开 PPR 不含 MP1 消息表（Inferred）。
 - 家族判定是硬编码白名单，新 SKU（Hawk Point 0x75、部分 Dragon Range）可能误落到 Zen3 分支，发出错误世代命令（Inferred，高风险静默失败点）。
 
@@ -42,7 +44,7 @@ SmuReader（门面/状态机）→ SmuSession（命令语义）→ SmuChannel（
 - 来源（**Verified，外部源码逐字核对**）：`irusanov/ZenStates-Core` dev 分支 `Cpu.cs::MakeCoreMask`（源码注释 `// [31-28] ccd index`、`// [23-20] core index`）；`irusanov/SMUDebugTool` `SettingsForm.cs:2562-2584` 的 `EncodeCoreMarginBitmask` 兜底路径 `(ccd<<8 | local)<<20` 独立一致。
 - 上游首选路径：经 APOB 核心映射 `MakeCoreMaskForLogicalCore` → `CoreMap.GetLogicalCore` 取得物理 CCD/CCX/Core，跳过被禁用的 CCD/核；不应仅用 `core/8`、`core%8` 简化推算（Inferred，来自源码结构）。
 - **Zentwik 旧实现曾误用独热位 `1 << (20+local)`**（核 3 发 `0x00800000`，正确应为 `3<<20 = 0x00300000`），与本定义及外部权威实现不符；由此得到的 SMU 拒绝**不是平台限制**，见 `research/02` §11 第四轮审计注记。
-- 写入参数：`(mask & 0xFFF00000) | 值`（本仓库旧实现记录，原始日志缺失，来源 Unknown）；"低 16 位放补码"为 Inferred 逆向口径，与上式低 20 位的记录存在位数差异，需实机确认。
+- 写入参数（**本轮上游源码确认，Verified 源码事实**）：`args[0] = (mask & 0xfff00000) | margin16`，其中 `margin16 = margin<0 ? (0x100000+margin)&0xffff : margin`（`ZenStates-Core Utils.cs:180-184`）。即**掩码占高 12 位、margin 占低 16 位（16 位补码）、[19:16] 保留**。此前"低 16 位 vs 低 20 位"的位数歧义已由此澄清（历史记录中 `research/02` 的"低 20 位"是含保留位的宽松描述）。作为芯片硬件协议仍为 Inferred（AMD 未公开）。详见 [implementation-references.md](implementation-references.md) §3.2。
 
 报告称（来源 Unknown，原始日志缺失）：`0xD5` 在本机（Ryzen 9 9955HX / Fire Range 被识别为 Granite Ridge）走 RSMU 邮箱，box 寄存器组 cmd 0x3B10524 / rsp 0x3B10570 / args 0x3B10A40。**早期实现使用错误独热位编码时曾报告"bit23 对应核被拒、其余 14 核可读"，该平台归因已于第四轮撤回**（见上条与 `research/02` §11），不得再作为平台限制事实引用。见 [measurement-evidence-schema.md](../../data/measurement-evidence-schema.md)。
 

@@ -5,7 +5,7 @@
 
 ## 目录
 
-- [cpu/](cpu/)：AMD SMU、Curve Optimizer、Intel OC Mailbox、CPU Sets 访问链路
+- [cpu/](cpu/)：AMD SMU、Curve Optimizer、Intel OC Mailbox、CPU Sets 访问链路；[成熟实现参考](cpu/implementation-references.md)（上游源码逐行核对，APOB/掩码/命令分派）
 - [gpu/](gpu/)：GPU 技术（待研究入口）
 - [memory/](memory/)：内存技术（待研究入口）
 - [sensors/](sensors/)：传感器与采样率（部分 Verified）
