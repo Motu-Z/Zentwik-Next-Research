@@ -97,7 +97,7 @@ PBO、PPT、TDC、EDC、Precision Boost、V/F curve、Curve Shaper、SMU Mailbox
 |---|---|---|
 | "CO offset 单位是 mV" | 是步进档位，无单位；mV 等效值不固定且未公开 | Verified（社区一致）+ 本仓库纠错记录 |
 | "-20 就是降 20 mV" | 不成立；3–5 mV/档只是粗略经验，非线性 | Inferred |
-| "写 0 = 恢复默认" | 写入 0 的实际行为（**Verified 源码**）：向 SMU 发 `SetMargin`（`SetDldoPsmMargin`），`margin=0`，把该核 CO 偏移设为 **0 档，即无偏移**（`args[0]=(mask&0xfff00000)|0`，`MakePsmMarginArg(0)=0`；见 [implementation-references.md](implementation-references.md) §3.2）。工具的"Zero all"按钮就是把所有启用核设为 0，其基线是硬件读回值（`ResetToBaseline`），不假定某个非零出厂值。**在未调校/默认状态下，无偏移（0）就是中性默认值**，因此"写 0 = 回到 CO 无偏移的中性状态"成立。需注意：**"恢复到某台曾被人改过（含 OEM 预设）的既有配置"不等于写 0**——但"厂商出厂普遍预置负 CO"没有证据，不能当作常态假设。"恢复默认"若特指 BIOS 的 Load Optimized Defaults，那是整套 BIOS 操作，与单次 CO 写 0 不是一回事 | 写入行为/中性值 0 = Verified 上游源码（设置 0=无偏移）；默认态无偏移 = Inferred（AMD 未发布"出厂即负偏移"的规范）；见 `research/02` §11 第三轮注记 |
+| "写 0 = 恢复默认" | 写入 0 将对应核心的 CO offset 设为零，即取消该项 CO 调整。对于未经过 CO 调校的默认配置，这就是中性状态。该操作不等同于恢复用户此前设置的非零配置，也不等同于恢复全部 BIOS 默认设置。 | 写入 0 = 设 0 档 = 无偏移（**Verified 上游源码**：`MakePsmMarginArg(0)=0`、`AllCcdZero_Click`、`ResetToBaseline`，见 [implementation-references.md](implementation-references.md) §3.2）；见 `research/02` §11 第六轮注记 |
 | "读到 0 = 默认状态" | 这是**读取语义**，与上一条"写入 0 的行为"是两个独立命题，不得互相替代：读到 0 说明当前该核偏移为 0（与"未施加偏移"一致），但仅凭一次读取仍不能证明设备从未被改过或处于 BIOS 出厂配置（那需要排除用户修改后的带日志读取）。反过来，读到非零也不等于"出厂预设" | 逻辑结论，见 [measurement-evidence-schema.md](../../data/measurement-evidence-schema.md) §3/§6 |
 | "所有核都必须能读写" / "部分核被平台拒绝" | 不能用早期报告的"bit23 被拒"当作平台限制：该观测来自**错误的独热位编码** `1<<(20+local)`，与外部权威实现 `(core%8)<<20` 不符；应改用正确数值编码 + APOB 映射逐核验证 | 编码错误 = Verified（外部源码逐字核对，见 [amd-smu.md](amd-smu.md) §3.1）；"平台拒绝 bit23" = **已撤回**；用户报告其他工具可改全核 = User-provided；见 `research/02` §11 第四轮审计注记 |
 | "命令号与固件无关，可全平台通用" | 命令号与 CPU 世代/型号强绑定；家族白名单误分类会发错世代命令 | Verified，`research/02` §2.2/§10 |
