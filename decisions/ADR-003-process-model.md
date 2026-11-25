@@ -37,4 +37,6 @@
 - `--install-service` / `--uninstall-service`：`CreateServiceW` 自动启动、`LocalSystem`；安装时把当前用户 SID 写入 `owner.sid`，供管道放行判定。
 - 管道用 `NamedPipeServerStreamAcl.Create` + 显式 `PipeSecurity`：SYSTEM/Administrators 完全控制、AuthenticatedUser 读写、数据目录所有者完全控制。
 - 每个连接建立前校验调用方：`GetNamedPipeClientProcessId` → `OpenProcess` → `OpenProcessToken` → TokenUser / TokenElevation / TokenIntegrityLevel；拒绝 Session 0、低于 Medium 完整性、非 `owner.sid` 的调用方。
-- 仍未验证：真实 `sc create` 安装/卸载、Session 0 服务与用户会话的实际通信、受限令牌下的越权拒绝（需要另造一个降权进程做负向测试）。
+- M3 补充：`--start-service` / `--stop-service` 走 SCM，状态等待带 20 秒超时；安装时写入恢复动作（5s/15s/60s 重启，1 天重置重启计数）；服务异常终止把失败写进服务状态（1066）而不是静默退出，否则 SCM 不会执行恢复动作。
+- 拒绝连接时先回一帧 `request.unauthorized` 再断开：直接关管道会让客户端把权限拒绝误判成代理崩溃。用例覆盖 Session 0、低完整性、非所有者 SID，以及"伪造 owner.sid 让真实管道拒绝"的端到端路径。
+- 仍未验证：真实 `sc create` 安装/卸载、Session 0 服务与用户会话的实际通信、受限令牌进程的越权拒绝（当前用伪造所有者 SID 等价模拟，未另造降权进程）。

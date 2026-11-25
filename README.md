@@ -12,7 +12,7 @@ Zentwik Next 的产品重定义、技术预研、架构决策与原型验证工�
 
 ## 当前阶段
 
-阶段 0 已完成（产品定义、旧版盘点、硬件链路、UI/IPC、技术栈评估与 ADR）。M2 已完成：应用层拆分、CLI 转为正式产品入口、服务化骨架与调用方校验、AMD CO 读写通道、场景引擎接入账本。WPF 界面暂停，恢复条件见 `research/handoffs/M2-2026-11-25.md`。
+阶段 0 已完成（产品定义、旧版盘点、硬件链路、UI/IPC、技术栈评估与 ADR）。M2 完成应用层拆分、CLI 正式入口、服务化骨架、AMD CO 通道与场景接入账本；M3 完成 IPC 拒绝显式报错、服务启停与崩溃恢复动作、场景退出/重启回退、界面可访问性与列表虚拟化实测。产品代码位于 `Motu-Z/Zentwik` 的 `next` 分支，`main` 未改动。
 
 成果索引：
 
@@ -22,7 +22,8 @@ Zentwik Next 的产品重定义、技术预研、架构决策与原型验证工�
 - `research/04-tech-stack-evaluation.md` 全栈评估（含实测数据）
 - `decisions/ADR-001..007` 技术栈、UI、进程、协议、方案与所有权、持久化、CLI 契约
 - `research/handoffs/M1-2026-11-25.md` M1 交接（骨架与纵向切片）
-- `research/handoffs/M2-2026-11-25.md` 当前交接（CLI、服务化、硬件通道）
+- `research/handoffs/M2-2026-11-25.md` M2 交接（CLI、服务化、硬件通道）
+- `research/handoffs/M3-2026-11-25.md` 当前交接（IPC 拒绝、服务恢复动作、场景退出回退、界面可访问性实测）
 - 产品代码：`D:\Projects\Zentwik Next`（README 含构建、运行、命令面与退出码）
 
 ## 核心原则
