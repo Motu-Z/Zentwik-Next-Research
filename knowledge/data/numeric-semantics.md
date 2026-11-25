@@ -51,7 +51,7 @@
 
 - 百分比（0–100）与比例（0.0–1.0）不是同一种值。字段必须显式命名：`usagePercent` 与 `usageRatio`。
 - 存储与 IPC 默认使用整数百分比或明确的强类型，避免浮点比较。
-- 利用率、负载、核心停泊百分比都是百分比，而 `Processor Performance`（PDH `% Processor Performance`）可以超过 100%（相对标称频率），属于**相对比率**，不得钳制到 100（依据 `research/02-hardware-access.md` §6 实测，Verified 实测）。
+- 利用率、负载、核心停泊百分比都是百分比，而 `Processor Performance`（PDH `% Processor Performance`）可以超过 100%（相对标称频率），属于**相对比率**，不得钳制到 100（PDH 计数器语义由 Microsoft 文档 Verified；`research/02` §6 的 155%/std 21pp 等具体观测值原始日志缺失、属报告称/Unknown，见 [measurement-evidence-schema.md](measurement-evidence-schema.md)）。
 
 ## 6. 物理量与时间基准（外部技术事实 / Verified）
 
@@ -66,7 +66,7 @@
 | 温度 | °C | °C、K | 差值的 °C 与 K 数值相同；绝对温度不是 |
 | 时间 | s | QPC tick、ms、100 ns | QPC 用于测量间隔；系统时钟用于时间戳 |
 
-时间基准规则：采样间隔用 QPC（单调、高分辨率）测量；显示时间戳用系统时钟；两者不可混用（依据 `research/02-hardware-access.md` §6、`research/03-ui-ipc-deployment.md` §2.1，Verified 实测）。
+时间基准规则：采样间隔用 QPC（单调、高分辨率）测量；显示时间戳用系统时钟；两者不可混用（Microsoft QPC 文档 Verified；`research/02` §6/`research/03` §2.1 的具体采样数字属报告称、原始日志缺失）。
 
 ## 7. 寄存器位域、掩码与枚举（外部技术事实 / Verified）
 
@@ -113,10 +113,10 @@
 | "-20 表示降低 20 mV" | AMD CO 是档位；等效 mV 不固定且未公开 |
 | "回读等于写入就生效了" | 请求型寄存器在锁定时仍可回读写入值；需负载下观测效果 |
 | "高频采样等于高信息量" | 短窗口量化噪声不是独立信息；需窗口聚合 |
-| "0 就是默认值" | 出厂可能已预置非零偏移；0 只是取消该偏移 |
+| "0 就是默认值" | 读到 0 不足以证明默认状态；默认须由 BIOS 恢复默认后、写入前的带日志读取确定。"出厂可能已预置非零偏移"的原归因已因无来源撤回（见 AUDIT §6） |
 
 ## 12. 核验状态说明
 
-- Verified：通用数值表示与物理单位；PDH 超 100%、定时器粒度、采样噪声来自仓库实测。
+- Verified：通用数值表示与物理单位；PDH 超 100% 与定时器粒度由 Microsoft 文档支持；采样噪声的具体数字来自仓库报告称（原始日志缺失、来源 Unknown）。
 - Inferred：把本项目四层模型作为通用规则推广到其他硬件领域。
 - Proposed：Zentwik 的字段命名与分层约定，尚未被产品代码全量落实。
