@@ -20,7 +20,7 @@ Curve Optimizer 是 AMD 在支持 PBO 的 Ryzen 处理器上提供的一项调�
 
 ## 2. 适用范围
 
-- 硬件：支持 PBO 的 AMD Ryzen / Threadripper；CO 逐核设置通常在 Zen 2 及以后、经 AGESA/BIOS 暴露。具体可用性与范围由 CPU 型号、主板 BIOS 和 AGESA 决定（Verified：AMD FAQ 指出 PBO 需兼容型号与主板）。
+- 硬件：支持 PBO 的 AMD Ryzen / Threadripper；CO 逐核设置通常在 Zen 2 及以后、经 AGESA/BIOS 暴露。具体可用性与范围由 CPU 型号、主板 BIOS 和 AGESA 决定（Verified：AMD FAQ 指出 PBO 需兼容型号与主板）。固件/AGESA 命令层一般约 -50…+50 档（负向通常可达 -50；正向多数 BIOS/Ryzen Master 只到 +30，部分工具到 +50），见第 5 节。
 - Zen 5 增加 Curve Shaper（按温度/频段分点微调），与 CO 并存但属于不同控制项（Verified：社区与 AMD Release Notes 曲线优化器自动测试描述）。
 
 ## 3. 技术行为
@@ -41,11 +41,14 @@ Curve Optimizer 是 AMD 在支持 PBO 的 Ryzen 处理器上提供的一项调�
 | 项 | 取值 | 核验状态 |
 |---|---|---|
 | 单位 | 档（step / count），**无单位**，不是 mV | Verified（社区与工具链一致；AMD 官方未发布单位定义，属外部事实缺失） |
-| 常见 BIOS 范围 | 约 -30 到 +30 | Inferred（社区资料：laptopjudge、SkatterBencher；因 CPU/BIOS 而异） |
-| 本仓库工具写入钳制范围 | -50 到 +50（旧代码输入侧钳制） | Verified（`research/02-hardware-access.md` §2.3；这是工具实现选择，非官方范围） |
+| 固件/AGESA 命令层档位范围 | 约 **-50 到 +50**（负向通常可达 -50；正向多数 BIOS/Ryzen Master 只到 +30，部分工具到 +50） | Verified（多源工具链一致：vectree.io、SMUDebugTool 源码、vgoodslab 的 -50 实操、本仓库旧代码钳制；AMD 官方 FAQ 不公布固件命令参数，故不标为官方定义）；正向 +30 上限因厂商而异 = Inferred |
+| 本仓库工具写入钳制范围 | -50 到 +50（旧代码输入侧钳制） | Verified（`research/02-hardware-access.md` §2.3）；该钳制**与固件常见档位范围一致**，不是工具凭空自创，也不是 AMD 官方公布值 |
+| 第三方工具软上限（非固件限制） | SMUDebugTool ±999、G-Helper [-40,0] | Verified（各工具源码/文档）；工具自身的保守或宽容上限，**不得当作固件事实** |
 | 等效电压 | 社区经验约 3–5 mV/档，且随频率点非线性变化 | Inferred，**禁止作为官方事实或换算公式写入产品契约** |
 
 > **关键结论**：AMD 从未发布"每档 = N mV"的官方换算。3–5 mV/档是社区实测经验值，随平台、频率点、温度而变。**任何把 CO offset 标注为 mV 的行为都是错误。**
+>
+> **易混淆点（务必区分两个维度）**：**档位范围**（约 -50…+50）是离散的计数值范围，回答"能设多少档"；**每档 mV 等效**不存在官方固定值，回答"每档值多少电压"。前者是固件/BIOS 允许的档数，后者是无官方定义的经验换算——不要把"-50 档"误读成"-50 mV"。
 
 ## 6. 转换规则
 
@@ -84,8 +87,10 @@ PBO、PPT、TDC、EDC、Precision Boost、V/F curve、Curve Shaper、SMU Mailbox
 | AMD Ryzen Master 产品页 / Release Notes | 官方 | 已访问 2026-11-25 | CO/PBO 特性存在性、参数调整方式 |
 | AMD PPR | 官方 | 公开版本不含 MP1 消息表 | 不能用于证明命令号 |
 | RyzenSMU.p / RyzenAdj 上游源码 | 维护者源码 | 经本仓库研究引用 | 邮箱与命令号口径 |
+| vectree.io（Zen5 CO/Curve Shaper 分析） | 专业社区 | 已访问 2026-11-25 | 固件/BIOS 档位范围：老 Zen3/早 Zen4 停 -30，当前 AGESA 常达 -50 |
+| SMUDebugTool / DeepWiki 源码索引、G-Helper 文档 | 维护者源码/文档 | 已访问 2026-11-25 | 第三方工具软上限 ±999 / [-40,0]（非固件限制） |
 | SkatterBencher 等社区分析 | 专业社区 | 二手线索 | 3–5 mV/档经验值（Inferred） |
-| `research/02-hardware-access.md` §2/§11 | 本仓库一手实测 | 已核验 | 命令号、掩码、实测纠错 |
+| `research/02-hardware-access.md` §2/§11 | 本仓库一手实测 | 已核验 | 命令号、掩码、实测纠错、输入侧 ±50 钳制 |
 
 ## 11. 待核验问题
 
@@ -99,7 +104,8 @@ PBO、PPT、TDC、EDC、Precision Boost、V/F curve、Curve Shaper、SMU Mailbox
 |---|---|
 | CO 存在、属 PBO、可逐核、可通过 BIOS/Ryzen Master 调整 | Verified |
 | CO 是步进档位而非 mV | Verified（工具链一致 + 本仓库纠错） |
-| 常见范围 -30…+30 | Inferred |
+| 固件/BIOS 常见档位范围 -50…+50（正向多数 BIOS 到 +30） | Verified（多源工具链一致；AMD 官方未公开固件命令参数） |
+| 第三方工具软上限 ±999 / [-40,0] | Verified（工具事实，非固件限制） |
 | 每档约 3–5 mV（经验，非线性） | Inferred，禁止当官方公式 |
 | SMU 命令号 0x06/0xD5、核心掩码编码 | Verified（本仓库实测）/ Inferred（协议来源） |
 | 出厂可能为非零偏移、bit23 部分核被拒 | Verified 实测（本机） |

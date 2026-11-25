@@ -5,7 +5,7 @@
 ## 数值与数据（跨领域前置）
 
 - [数值语义总则](data/numeric-semantics.md) — 有单位/无单位、原始值/工程值、有符号、百分比、物理量、位域、四层表示 · 混合
-- [单位与换算](data/units.md) — 电压/频率/功率/能量/时间/温度换算；CO 与 Intel 单位对照 · V/I
+- [单位与换算](data/units.md) — 电压/频率/功率/能量/时间/温度换算；RAPL 单位 1/2^n（非 2^n）、FMax 上限范围；CO 与 Intel 单位对照 · V/I
 - [序列化与持久化](data/serialization-persistence.md) — SchemaVersion、原子替换、多态、兼容性 · V
 
 ## 术语与命名
@@ -15,9 +15,9 @@
 
 ## 硬件 · CPU（重点核验）
 
-- [AMD Curve Optimizer](hardware/cpu/amd-curve-optimizer.md) — **步进档位非 mV**；范围、换算、误解、实测 · 混合
+- [AMD Curve Optimizer](hardware/cpu/amd-curve-optimizer.md) — **步进档位非 mV**；固件范围 -50…+50（正向多数 +30）、换算、误解、实测 · 混合
 - [Intel OC Mailbox](hardware/cpu/intel-oc-mailbox.md) — **11 位有符号 1/1024 V 定点、×1.024**；UVP、邮箱协议 · 混合
-- [AMD SMU 链路](hardware/cpu/amd-smu.md) — 邮箱命令号、核心掩码、世代绑定、权限、三态 · 混合
+- [AMD SMU 链路](hardware/cpu/amd-smu.md) — 邮箱命令号、核心掩码、世代绑定、权限、三态；**FMax Override -1000…+200 MHz / 25 MHz（上限非偏移）** · 混合
 
 ## 硬件 · 传感器与待研究
 

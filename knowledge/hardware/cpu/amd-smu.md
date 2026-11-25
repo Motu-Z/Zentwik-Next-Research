@@ -5,7 +5,7 @@
 - 缩写：SMU、MP1、RSMU
 - 领域：`hardware/cpu`
 - 核验状态：混合（见分项）
-- 权威来源：RyzenSMU.p 上游模块源码；PawnIO 项目文档（签名模块、许可、反作弊）；本仓库 `research/02-hardware-access.md` §2/§11
+- 权威来源：RyzenSMU.p 上游模块源码；PawnIO 项目文档（签名模块、许可、反作弊）；SkatterBencher（PBO+ / Fmax Override 范围）、MSI 官方博客（25 MHz 步进、+200 MHz）；本仓库 `research/02-hardware-access.md` §2/§11
 - 相关文档：[amd-curve-optimizer.md](amd-curve-optimizer.md)、[security-service.md](../../windows/security-service.md)
 
 ## 1. 定义与范围
@@ -42,6 +42,10 @@ SmuReader（门面/状态机）→ SmuSession（命令语义）→ SmuChannel（
 - 就绪探针：发 `0x01`，参数 `[1,0,…]`，要求回 `2`；不通即 `ProbeFailed`，不进入写入。
 - CO 写入：逐核 SetMargin → GetMargin 回读 → 不等即 `VerifyFailed`。
 - FMax 写入：先读基线再写，回读容差 ≤10 MHz；基线为 0 视为该平台不实现该消息。
+- **FMax 语义与范围（外部技术事实，Verified）**：FMax（Fused maximum frequency，融合最大频率）是 Precision Boost 的频率上限限制器；`Boost Clock Override` / `Fmax Override` / `Auto OC` 是 PBO+ 提供的控制项，**在 -1000 MHz 到 +200 MHz 之间以 25 MHz 步进覆盖该上限**，Zen 2 起引入（SkatterBencher、MSI 官方博客多源一致）。关键语义：**它是频率上限（ceiling）而非频率偏移（offset）**——设置为 +200 只抬高可允许的最高频率，实际运行频率仍由 Precision Boost 2 按温度/功耗/电流决定，不保证真的升高 200 MHz。
+  - 单位 MHz，**有符号**（负向下调上限，正向上调），**步进 25 MHz**（BIOS 侧；SkatterBencher 指出 Zen5 用专用工具可低至 1 MHz 粒度，仍标 Inferred）。
+  - 与 CO 的区别：CO 是无单位档位偏移 V/F 曲线，FMax Override 是带单位的频率上限覆盖，二者单位与语义均不同，禁止共用类型或换算。
+  - Zentwik 内部约定（Proposed）：字段命名 `fmaxOverrideMHz`（`i16`，单位 MHz），不写成无量纲档，也不与 `CurveOffsetStep` 互换。
 - 并发：旧版进程内 `static lock`，**跨进程不成立**；新项目句柄收归单一特权服务（ADR-003）。
 - 超时：驱动内部轮询上限 8096 次；旧版只取 Win32 错误码而非 NTSTATUS，"区分拒绝与命令不存在"在实现上做不到（Inferred）。
 
@@ -69,4 +73,4 @@ Zen3/4/5 各一台的 CO/FMax 读写矩阵；S3/S4 恢复后是否丢 CO；PawnI
 
 ## 9. 核验状态分项
 
-命令号与掩码编码、写入回读、权限实测 = Verified（本仓库）；协议来源、家族误分类 = Inferred；休眠清回出厂 = Unverified。
+命令号与掩码编码、写入回读、权限实测 = Verified（本仓库）；FMax Override 范围 -1000…+200 MHz / 25 MHz 步进、上限非偏移语义 = Verified（SkatterBencher / MSI 官方）；协议来源、家族误分类、Zen5 的 1 MHz 粒度 = Inferred；休眠清回出厂 = Unverified。

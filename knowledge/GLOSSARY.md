@@ -14,6 +14,7 @@
 ## D–F
 
 - **账单 / 账本（Ledger）** — 记录写对象前值/目标/实际/所有权/恢复资格的状态机 → [state-ownership.md](domain/state-ownership.md)
+- **FMax / Boost Clock Override** ⚠ — AMD 频率**上限**覆盖，-1000…+200 MHz、25 MHz 步进（非偏移、非 mV） → [amd-smu.md](hardware/cpu/amd-smu.md)、[units.md](data/units.md)
 - **定点编码值** ⚠ — 整数表示缩放后的物理量，须反解单位 → [numeric-semantics.md](data/numeric-semantics.md)
 - **Provider** — 某领域在某硬件平台的具体实现；一领域可多 Provider → [modules-capabilities.md](architecture/modules-capabilities.md)
 

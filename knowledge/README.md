@@ -40,4 +40,4 @@
 ## 当前成熟度
 
 已建立规范：AMD Curve Optimizer、Intel OC Mailbox、数值语义总则、单位换算、三类方案、场景仲裁、状态所有权、模块与能力、生命周期、IPC、Windows 电源/调度/安全、命名规范、核心词汇。
-待研究入口：GPU、内存、部分传感器通道、休眠唤醒、RAPL 单位细节。
+待研究入口：GPU、内存、部分传感器通道、休眠唤醒。RAPL 单位缩放（1/2^n）与 FMax Override 范围已完成核验，见 [units.md](data/units.md) 与 [amd-smu.md](hardware/cpu/amd-smu.md)。
