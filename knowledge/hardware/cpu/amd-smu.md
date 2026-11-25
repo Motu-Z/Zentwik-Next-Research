@@ -34,8 +34,17 @@ SmuReader（门面/状态机）→ SmuSession（命令语义）→ SmuChannel（
 
 - 命令号来自逆向工具链口径，AMD 公开 PPR 不含 MP1 消息表（Inferred）。
 - 家族判定是硬编码白名单，新 SKU（Hawk Point 0x75、部分 Dragon Range）可能误落到 Zen3 分支，发出错误世代命令（Inferred，高风险静默失败点）。
-- 核心掩码：bit[31:28]=CCD、bit[27:24]=CCX、bit[23:20]=核内序号；写入低 16 位放偏移量补码。
-- 报告称（来源 Unknown，原始日志缺失）：`0xD5` 在本机（Ryzen 9 9955HX / Fire Range 被识别为 Granite Ridge）走 RSMU 邮箱，box 寄存器组 cmd 0x3B10524 / rsp 0x3B10570 / args 0x3B10A40；bit23 对应的核被拒，其余 14 核可读。见 `research/02` §11 第三轮审计注记与 [measurement-evidence-schema.md](../../data/measurement-evidence-schema.md)。
+
+### 3.1 核心掩码编码（本仓库单一权威定义，其余文档只引用不重抄）
+
+- 位布局：`[31:28]` = CCD index；`[27:24]` = CCX index；`[23:20]` = **核内序号（4 位数值字段，0–7）**；`[19:0]` 保留。**`[23:20]` 是数值字段，不是独热位。**
+- 现代桌面（family > 17h）：`mask = (ccd << 28) | ((core % 8) << 20)`，CCX 位为 0（Zen3 起每 CCD 仅一个 CCX）。旧 17h 分支：`(ccd << 28) | ((ccx % 2) << 24) | ((core % 4) << 20)`。
+- 来源（**Verified，外部源码逐字核对**）：`irusanov/ZenStates-Core` dev 分支 `Cpu.cs::MakeCoreMask`（源码注释 `// [31-28] ccd index`、`// [23-20] core index`）；`irusanov/SMUDebugTool` `SettingsForm.cs:2562-2584` 的 `EncodeCoreMarginBitmask` 兜底路径 `(ccd<<8 | local)<<20` 独立一致。
+- 上游首选路径：经 APOB 核心映射 `MakeCoreMaskForLogicalCore` → `CoreMap.GetLogicalCore` 取得物理 CCD/CCX/Core，跳过被禁用的 CCD/核；不应仅用 `core/8`、`core%8` 简化推算（Inferred，来自源码结构）。
+- **Zentwik 旧实现曾误用独热位 `1 << (20+local)`**（核 3 发 `0x00800000`，正确应为 `3<<20 = 0x00300000`），与本定义及外部权威实现不符；由此得到的 SMU 拒绝**不是平台限制**，见 `research/02` §11 第四轮审计注记。
+- 写入参数：`(mask & 0xFFF00000) | 值`（本仓库旧实现记录，原始日志缺失，来源 Unknown）；"低 16 位放补码"为 Inferred 逆向口径，与上式低 20 位的记录存在位数差异，需实机确认。
+
+报告称（来源 Unknown，原始日志缺失）：`0xD5` 在本机（Ryzen 9 9955HX / Fire Range 被识别为 Granite Ridge）走 RSMU 邮箱，box 寄存器组 cmd 0x3B10524 / rsp 0x3B10570 / args 0x3B10A40。**早期实现使用错误独热位编码时曾报告"bit23 对应核被拒、其余 14 核可读"，该平台归因已于第四轮撤回**（见上条与 `research/02` §11），不得再作为平台限制事实引用。见 [measurement-evidence-schema.md](../../data/measurement-evidence-schema.md)。
 
 ## 4. 写入、验证与失败处理（本仓库旧实现记录，Verified 设计原则 / 实测细节来源 Unknown）
 
@@ -84,4 +93,4 @@ Zen3/4/5 各一台的 CO/FMax 读写矩阵；S3/S4 恢复后是否丢 CO；PawnI
 
 ## 9. 核验状态分项
 
-命令号与掩码编码 = Inferred（逆向协议口径）；写入回读、权限、bit23 部分核被拒 = 本仓库报告称，原始日志缺失、来源 Unknown（不得标 Verified 实测）；通道三态等设计原则 = Verified 设计决策；FMax Override 范围 -1000…+200 MHz / 25 MHz 步进、上限非偏移语义 = Inferred（专业社区 SkatterBencher 已逐字核对原文，非 AMD 官方规范）；家族误分类、Zen5 的 1 MHz 粒度 = Inferred；休眠清回出厂 = Unverified。
+命令号 = Inferred（逆向协议口径）；**核心掩码编码 `[23:20]` 为 4 位核内序号、非独热位 = Verified（外部源码 `Cpu.cs::MakeCoreMask` 与 `SettingsForm.cs` 逐字核对，见 §3.1）**；Zentwik 旧实现误用独热位 `1<<(20+local)` = Verified（源码比对），据此**撤回"平台拒绝 bit23"归因**（第四轮）；写入回读、权限 = 本仓库报告称，原始日志缺失、来源 Unknown（不得标 Verified 实测）；通道三态等设计原则 = Verified 设计决策；FMax Override 范围 -1000…+200 MHz / 25 MHz 步进、上限非偏移语义 = Inferred（专业社区 SkatterBencher 已逐字核对原文，非 AMD 官方规范）；家族误分类、Zen5 的 1 MHz 粒度 = Inferred；休眠清回出厂 = Unverified。

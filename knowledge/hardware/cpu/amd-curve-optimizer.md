@@ -97,7 +97,7 @@ PBO、PPT、TDC、EDC、Precision Boost、V/F curve、Curve Shaper、SMU Mailbox
 | "CO offset 单位是 mV" | 是步进档位，无单位；mV 等效值不固定且未公开 | Verified（社区一致）+ 本仓库纠错记录 |
 | "-20 就是降 20 mV" | 不成立；3–5 mV/档只是粗略经验，非线性 | Inferred |
 | "写 0 = 恢复默认" | 错。**读到 0 不等于默认状态**：读取值不能证明设备处于默认/出厂状态（默认状态须由 BIOS 恢复默认后、任何写入前的、带原始日志的读取确定） | 逻辑结论（依据 [measurement-evidence-schema.md](../../data/measurement-evidence-schema.md) §3/§6）。**原"出厂为 -11…-26"归因已于第三轮撤回：无原始数据、状态混淆，标 Unknown**，见 `research/02` §11 审计注记 |
-| "所有核都必须能读写" | 本平台 bit23 对应核被邮箱拒绝，属部分可用 | 报告称（原始日志缺失，来源 Unknown），`research/02` §11；见 [measurement-evidence-schema.md](../../data/measurement-evidence-schema.md) |
+| "所有核都必须能读写" / "部分核被平台拒绝" | 不能用早期报告的"bit23 被拒"当作平台限制：该观测来自**错误的独热位编码** `1<<(20+local)`，与外部权威实现 `(core%8)<<20` 不符；应改用正确数值编码 + APOB 映射逐核验证 | 编码错误 = Verified（外部源码逐字核对，见 [amd-smu.md](amd-smu.md) §3.1）；"平台拒绝 bit23" = **已撤回**；用户报告其他工具可改全核 = User-provided；见 `research/02` §11 第四轮审计注记 |
 | "命令号与固件无关，可全平台通用" | 命令号与 CPU 世代/型号强绑定；家族白名单误分类会发错世代命令 | Verified，`research/02` §2.2/§10 |
 | "回读相同即写入成功" | 这是必要条件；仍需观测效果层（频率/功耗/温度）以排除钳位 | Inferred，`research/02` §8.3 |
 | "CO 是 ±50 对称范围" | 不对称：负向常见 −50、正向常见 +30；且这些是工具/显示观测，非 AMD 发布的固件范围 | MSI FAQ（Verified 厂商文档）+ 用户提供实测（User-provided，未独立复核），见 §5 |
@@ -108,7 +108,7 @@ PBO、PPT、TDC、EDC、Precision Boost、V/F curve、Curve Shaper、SMU Mailbox
 
 1. 字段统一命名 `coOffset`，类型 `CurveOffsetStep`，**不得**命名为 `millivolts`/`mv`。
 2. CLI 打印格式：`core <n>  co <step>`，**不得**打印 `offset(mV)`。早期实现曾犯此错并已纠正（`research/02` §11）。
-3. 能力状态区分 `Available` / `NotSupported` / `DriverUnavailable` / `ProbeFailed`；部分核可读时标记 `degraded` 并逐核报 `error`，不阻塞其余核。
+3. 能力状态区分 `Available` / `NotSupported` / `DriverUnavailable` / `ProbeFailed`；逐核失败时标记 `degraded` 并报 `error`，不阻塞其余核。**但失败必须先排除编码错误**：核心掩码按 [amd-smu.md](amd-smu.md) §3.1 的数值编码 `(ccd<<28)|((core%8)<<20)` 实现，不得用独热位 `1<<(20+local)`；否则会把实现缺陷误报为"平台部分可用"。
 4. 方案引用了读不到前值的核时记 `Skipped` 且不写入。
 5. 持久化必须记录来源（SMU 读出 / 用户输入 / 推断）、采集时间、CPU 身份（family/model/stepping/微码）；不得把"上次写入值"当出厂值（对应 `project/ARCHITECTURE_CONSTRAINTS.md` §10）。
 6. `PlanApplyRecord.PersistsAcrossReboot` 对 AMD CO 为 `true`（ADR-005）。
@@ -120,17 +120,18 @@ PBO、PPT、TDC、EDC、Precision Boost、V/F curve、Curve Shaper、SMU Mailbox
 | AMD Ryzen Master 产品页 / Release Notes | 官方 | 已访问 2026-11-25 | CO/PBO 特性存在性、参数调整方式 |
 | MSI FAQ-10122（Curve Optimizer Magnitude vs Ryzen Master 显示） | 厂商官方 FAQ | 已访问 2026-11-25 | Ryzen Master 显示钳制 +30/−50，实际可设定并应用超出该范围；证明显示范围 ≠ 固件范围 |
 | AMD FAQ — Curve Optimizer Feature in Ryzen Master（Build 2.9.0.2093） | 官方 PDF | 已访问 2026-11-25 | CO 定义、All Core/Per Core、验证方式；官方 FAQ 未给固件档位边界 |
-| SMU Debug Tool 源码 `SettingsForm.cs`（irusanov 仓库镜像） | 维护者源码 | 已访问 2026-11-25 | CO 输入框 ±999（无命名常量）；−50…+30 出现在 Curve Shaper 说明文字 |
+| SMU Debug Tool 源码 `SettingsForm.cs`（irusanov 仓库镜像） | 维护者源码 | 已访问 2026-11-25；第四轮逐行核对 `2562-2584` | CO 输入框 ±999（无命名常量）；−50…+30 出现在 Curve Shaper 说明文字；`EncodeCoreMarginBitmask` 数值编码 `(ccd<<8\|local)<<20` |
+| ZenStates-Core `Cpu.cs`（irusanov，dev 分支） | 上游维护者源码 | **第四轮实际打开并逐字引用** | `MakeCoreMask`：桌面 `(ccd<<28)\|((core%8)<<20)`、`[23:20]`=核内序号数值字段；`MakeCoreMaskForLogicalCore` 走 APOB 映射；证明独热位编码错误、平台归因不成立 |
 | AMD PPR | 官方 | 公开版本不含 MP1 消息表 | 不能用于证明命令号 |
 | RyzenSMU.p / RyzenAdj 上游源码 | 维护者源码 | 经本仓库研究引用 | 邮箱与命令号口径 |
 | vectree.io（Zen5 CO/Curve Shaper 分析） | 专业社区 | 已访问 2026-11-25 | BIOS 侧观测：老 Zen3/早 Zen4 停 -30，当前 AGESA 常见 −50；仅为工具/BIOS 侧观测，非官方固件范围（Inferred） |
 | SMUDebugTool / DeepWiki 源码索引、G-Helper 文档 | 维护者源码/文档 | 已访问 2026-11-25 | 第三方工具软上限 ±999 / [-40,0]（非固件限制） |
 | SkatterBencher 等社区分析 | 专业社区 | 二手线索 | 3–5 mV/档经验值（Inferred） |
-| `research/02-hardware-access.md` §2/§11 | 本仓库研究记录（原标"实测"） | 原始日志缺失，多处来源 Unknown；第三轮已降级 | 命令号/掩码（逆向口径 Inferred）、输入侧 ±50 钳制（旧实现记录）；"出厂 −11…−26"已撤回 |
+| `research/02-hardware-access.md` §2/§11 | 本仓库研究记录（原标"实测"） | 原始日志缺失，多处来源 Unknown；第三轮降级、第四轮撤回平台归因 | 命令号（逆向口径 Inferred）、输入侧 ±50 钳制（旧实现记录）；"出厂 −11…−26"已撤回；"bit23 平台拒绝"已撤回（实为独热位编码错误） |
 
 ## 11. 待核验问题
 
-- bit23 在 Ryzen 9 9955HX 上被拒的根因（独热位编码差异 vs 该平台不接受该 bit），需一次完整掩码扫描确认。
+- **修正编码后的实机复验（最高优先）**：旧实现用独热位 `1<<(20+local)` 导致核 3/11 掩码错误（应为 `3<<20`、`0x10300000`）；改用数值编码 + APOB 映射后，逐核读/写/回读确认 Ryzen 9 9955HX 全部 16 核可读、是否存在真实失败核，并保存原始日志与工具版本。用户已报告其他工具可改全核（User-provided），本仓库无硬件，保持 Unverified，见 `research/02` §11 第四轮审计注记。
 - Zen5 / Hawk Point / Dragon Range 的家族白名单误分类是否已在新版模块中修复。
 - S3/S4 恢复后 CO 是否丢失。
 - **本机 SMU Debug Tool 的 −50/+30 界限来源**：工具无关直写测试 +31…+50 是否被 SMU 接受并回读一致；补记工具准确版本。来源定性前保持 Unverified。
@@ -147,7 +148,8 @@ PBO、PPT、TDC、EDC、Precision Boost、V/F curve、Curve Shaper、SMU Mailbox
 | 第三方工具软上限 ±999 / [-40,0]；−50…+30 属 Curve Shaper | Verified（工具事实/源码，非固件限制） |
 | 用户 SMU Debug Tool 报告 CO 负向 −50、正向 +30，不对称 | **User-provided**（用户自述，未附原始日志/工具版本，本仓库未独立复核）；**来源（工具/固件/平台）Unverified** |
 | 每档约 3–5 mV（经验，非线性） | Inferred，禁止当官方公式 |
-| SMU 命令号 0x06/0xD5、核心掩码编码 | Inferred（逆向协议口径）；本仓库曾报告写入/回读过程但原始日志缺失、来源 Unknown |
+| SMU 命令号 0x06/0xD5 | Inferred（逆向协议口径）；本仓库曾报告写入/回读过程但原始日志缺失、来源 Unknown |
+| 核心掩码编码 `[23:20]` 为 4 位核内序号、非独热位 | **Verified（外部源码逐字核对，见 [amd-smu.md](amd-smu.md) §3.1）** |
 | "出厂可能为非零偏移（本仓库 14 核 -11…-26）" | **已撤回 / Unknown**：无原始数据、状态混淆（同会话有写入），见 `research/02` §11 第三轮审计注记。仅保留"读到 0 ≠ 默认状态"为逻辑结论 |
-| bit23 部分核被邮箱拒绝 | 报告称，来源 Unknown（原始日志缺失）；不得标 Verified 实测 |
+| "bit23 部分核被平台拒绝" | **已撤回**：源于旧实现独热位编码错误（Verified 源码比对），非平台限制；用户报告其他工具可改全核 = User-provided（未附日志/工具版本）。修正编码后的实机结果 Unverified |
 | 休眠恢复清回出厂的假设 | Unverified |
