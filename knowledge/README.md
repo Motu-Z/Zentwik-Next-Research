@@ -39,5 +39,7 @@
 
 ## 当前成熟度
 
-已建立规范：AMD Curve Optimizer、Intel OC Mailbox、数值语义总则、单位换算、三类方案、场景仲裁、状态所有权、模块与能力、生命周期、IPC、Windows 电源/调度/安全、命名规范、核心词汇。
+已建立规范：AMD Curve Optimizer、Intel OC Mailbox、数值语义总则、单位换算、**参数分层记录规范**、三类方案、场景仲裁、状态所有权、模块与能力、生命周期、IPC、Windows 电源/调度/安全、命名规范、核心词汇。
+
+专项审计见 [AUDIT.md](AUDIT.md)：记录了数值/单位/层级错误的发现、修正与单一维护点。写硬件参数范围前先读 [参数分层记录规范](data/parameter-record-schema.md)，区分固件范围、软件钳制、实际稳定值、典型调校值与项目约定。
 待研究入口：GPU、内存、部分传感器通道、休眠唤醒。RAPL 单位缩放（1/2^n）与 FMax Override 范围已完成核验，见 [units.md](data/units.md) 与 [amd-smu.md](hardware/cpu/amd-smu.md)。

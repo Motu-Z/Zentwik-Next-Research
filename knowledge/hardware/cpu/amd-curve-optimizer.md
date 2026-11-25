@@ -36,7 +36,23 @@ Curve Optimizer 是 AMD 在支持 PBO 的 Ryzen 处理器上提供的一项调�
 - 硬件协议中，偏移量随核心掩码一起放在低 16 位（负值以补码表示），见 `research/02-hardware-access.md` §2.2。
 - Zentwik 内部约定（Proposed）：使用独立强类型 `CurveOffsetStep`（`i8`/`i16`），禁止与电压类型 `VoltageMillivolt` 互相隐式赋值。
 
-## 5. 单位及取值范围
+## 5. 单位及取值范围（本参数的分层权威定义）
+
+> 本节是 CO 参数在仓库内的**单一权威定义点**，其余文档只引用不重抄。分层规则见 [parameter-record-schema.md](../../data/parameter-record-schema.md)。
+
+**参数记录**：Curve Optimizer offset
+**语义**：Voltage/Frequency Curve Offset（逐核 V/F 曲线偏移） · **数据类型**：有符号整数（step/count） · **单位**：无（不是 mV）
+
+| 层 | 取值 | 说明 / 来源 / 状态 |
+|---|---|---|
+| L1 固件/AGESA 实际允许 | 约 -50…+50 档（正向多数 BIOS/Ryzen Master 到 +30） | 多源工具链一致；AMD 官方未公开固件命令参数。Verified（范围本体）/ Inferred（正向 +30 的厂商差异） |
+| L2 软件输入钳制 | 旧版 Zentwik 输入侧 -50…+50 | `research/02` §2.3；`workbuddy-*` 工具实现选择，非固件事实。Verified |
+| L2 第三方工具上限 | SMUDebugTool ±999、G-Helper [-40,0] | 各工具源码/文档；软上限，非固件限制。Verified |
+| L3 实际稳定可用 | 取决于 CPU 个体、散热、电压与负载 | 无通用数值，强核常只能 -5…−15，弱核可达更负。**Unverified，不填规范限制** |
+| L4 典型调校值 | 社区常见 -10…−30 起点 | **仅作参考，非规范限制、非官方推荐** |
+| L5 Zentwik 约定 | 字段 `coOffset`、类型 `CurveOffsetStep`（i8/i16）、单位 `step`、不持久化 mV | Proposed，见 §9 |
+
+明细与证据：
 
 | 项 | 取值 | 核验状态 |
 |---|---|---|

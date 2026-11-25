@@ -42,10 +42,21 @@ SmuReader（门面/状态机）→ SmuSession（命令语义）→ SmuChannel（
 - 就绪探针：发 `0x01`，参数 `[1,0,…]`，要求回 `2`；不通即 `ProbeFailed`，不进入写入。
 - CO 写入：逐核 SetMargin → GetMargin 回读 → 不等即 `VerifyFailed`。
 - FMax 写入：先读基线再写，回读容差 ≤10 MHz；基线为 0 视为该平台不实现该消息。
-- **FMax 语义与范围（外部技术事实，Verified）**：FMax（Fused maximum frequency，融合最大频率）是 Precision Boost 的频率上限限制器；`Boost Clock Override` / `Fmax Override` / `Auto OC` 是 PBO+ 提供的控制项，**在 -1000 MHz 到 +200 MHz 之间以 25 MHz 步进覆盖该上限**，Zen 2 起引入（SkatterBencher、MSI 官方博客多源一致）。关键语义：**它是频率上限（ceiling）而非频率偏移（offset）**——设置为 +200 只抬高可允许的最高频率，实际运行频率仍由 Precision Boost 2 按温度/功耗/电流决定，不保证真的升高 200 MHz。
-  - 单位 MHz，**有符号**（负向下调上限，正向上调），**步进 25 MHz**（BIOS 侧；SkatterBencher 指出 Zen5 用专用工具可低至 1 MHz 粒度，仍标 Inferred）。
+- **FMax / Boost Clock Override（本参数的分层权威定义）**：本节是仓库内单一权威定义点，其余文档只引用不重抄；分层规则见 [parameter-record-schema.md](../../data/parameter-record-schema.md)。
+
+  **参数记录**：Boost Clock Override（Fmax Override / Auto OC）
+  **语义**：Maximum Boost Frequency Ceiling Override · **数据类型**：有符号整数 · **单位**：MHz
+
+  | 层 | 取值 | 说明 / 来源 / 状态 |
+  |---|---|---|
+  | L1 固件/AGESA 实际允许 | -1000…+200 MHz，步进 25 MHz | BIOS/PBO+ 侧，Zen 2 起；SkatterBencher、MSI 官方博客多源一致。Verified（范围与步进本体） |
+  | L1 工具侧更细粒度 | Zen5 用专用工具可低至 1 MHz | BIOS 菜单仍 25 MHz；SkatterBencher。Inferred |
+  | L3 实际运行频率 | 由 Precision Boost 2 按温度/功耗/电流决定 | **+200 只抬上限，不保证实频升 200 MHz**；非参数范围 |
+  | L5 Zentwik 约定 | 字段 `fmaxOverrideMHz`（i16，单位 MHz） | Proposed；不与 `CurveOffsetStep` 互换 |
+
+  **术语辨析（不得画等号）**：FMax（Fused maximum frequency）是芯片出厂融合的最大频率限制器，是一个**绝对频率**；Boost Clock Override / Fmax Override / Auto OC 是 PBO+ 提供的**频率上限覆盖偏移参数**；实际运行频率是 Precision Boost 最终决定的值。三者是不同概念。不得把 FMax 绝对频率范围（如某 SKU 4450…5650 MHz，见 `research/01-legacy-inventory.md`）与 FMax Override 的偏移范围（-1000…+200 MHz）混淆。
+  - 适用范围与条件：随 CPU 代际、AGESA、 BIOS 与工具而变，**不是所有处理器/BIOS/工具的绝对限制**（Unverified 部分按平台核验）。
   - 与 CO 的区别：CO 是无单位档位偏移 V/F 曲线，FMax Override 是带单位的频率上限覆盖，二者单位与语义均不同，禁止共用类型或换算。
-  - Zentwik 内部约定（Proposed）：字段命名 `fmaxOverrideMHz`（`i16`，单位 MHz），不写成无量纲档，也不与 `CurveOffsetStep` 互换。
 - 并发：旧版进程内 `static lock`，**跨进程不成立**；新项目句柄收归单一特权服务（ADR-003）。
 - 超时：驱动内部轮询上限 8096 次；旧版只取 Win32 错误码而非 NTSTATUS，"区分拒绝与命令不存在"在实现上做不到（Inferred）。
 

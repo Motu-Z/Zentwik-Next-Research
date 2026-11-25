@@ -34,7 +34,8 @@ CPU Sets 提供以"软（soft）"方式声明应用亲和性的 API，与操作�
 ## 4. 本仓库实现事实（Verified）
 
 - 两组 API 都实现，切换前先清另一侧，因二者叠加取交集。
-- 拓扑来自 `GetSystemCpuSetInformation`，按 `LastLevelCacheIndex` 分组；`Type` 字段是 2 字节，推进步长用回填的 `Size`（曾因按 4 字节读导致拓扑恒空）。
+- 拓扑来自 `GetSystemCpuSetInformation`，按 `LastLevelCacheIndex` 分组；推进步长用回填的 `Size`（可变长结构，Microsoft 原文）。
+  - **【审计注记 2026-11-25，Unverified 冲突】** 旧版实现记录称"`Type` 字段是 2 字节，按 4 字节读会导致拓扑恒空"（`research/02` §5）。但 Microsoft 官方结构 `SYSTEM_CPU_SET_INFORMATION` 中 `Type` 类型为 `CPU_SET_INFORMATION_TYPE` 枚举，底层为 4 字节 `DWORD`（已核对 winnt.h 文档）。两者矛盾：可能是旧版代码的对齐/偏移误判，也可能是记录有误。此处按"本仓库旧版实现现象"保留，**不作为 Windows API 技术事实**，真机复核前标 Unverified；不要据此在别处写"Type 是 2 字节"。
 - >64 逻辑处理器时亲和性直接拒绝，不用 128 位掩码硬塞 64 位。
 - CPU Set 是进程属性，进程重启丢失，需 watcher 补绑；Toolhelp32 快照差集 1 秒一轮，不用 WMI（WMI 常驻吃 8% 单核）。
 - 解绑只清"本工具成功绑过"的 PID，不碰用户自己设的亲和性。
