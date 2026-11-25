@@ -12,7 +12,17 @@ Zentwik Next 的产品重定义、技术预研、架构决策与原型验证工�
 
 ## 当前阶段
 
-阶段 0：研究工作区建立与产品/技术预研。先形成可验证的产品定义、技术选型和架构决策，再进入正式实现。
+阶段 0 已完成（产品定义、旧版盘点、硬件链路、UI/IPC、技术栈评估与 ADR）。新项目骨架与端到端切片已跑通，进入 M1→M2：服务化、可访问性实测、硬件写入闭环。
+
+成果索引：
+
+- `research/01-legacy-inventory.md` 旧版功能与实现盘点
+- `research/02-hardware-access.md` AMD SMU / Intel MSR / 电源 / 调度链路
+- `research/03-ui-ipc-deployment.md` UI 框架、进程模型、IPC、部署
+- `research/04-tech-stack-evaluation.md` 全栈评估（含实测数据）
+- `decisions/ADR-001..006` 技术栈、UI、进程、协议、方案与所有权、持久化
+- `research/handoffs/M1-2026-11-25.md` 当前交接
+- 产品代码：`D:\Projects\Zentwik Next`（骨架 + 原型）
 
 ## 核心原则
 
