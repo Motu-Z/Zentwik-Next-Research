@@ -60,7 +60,7 @@ Zen4/5 补充命令号（**Verified 上游源码** `Zen4Settings.cs`，本轮逐
 
   | 层 | 取值 | 说明 / 来源 / 状态 |
   |---|---|---|
-  | L1 固件/AGESA 实际允许 | -1000…+200 MHz，步进 25 MHz | BIOS/PBO+ 侧，Zen 2 起；SkatterBencher、MSI 官方博客多源一致。Verified（范围与步进本体） |
+  | L1 固件/AGESA 实际允许 | -1000…+200 MHz，步进 25 MHz | BIOS/PBO+ 侧，Zen 2 起；SkatterBencher、MSI 官方博客多源一致。Inferred（专业社区来源，非 AMD 官方规范；见 §9 核验状态分项） |
   | L1 工具侧更细粒度 | Zen5 用专用工具可低至 1 MHz | BIOS 菜单仍 25 MHz；SkatterBencher。Inferred |
   | L3 实际运行频率 | 由 Precision Boost 2 按温度/功耗/电流决定 | **+200 只抬上限，不保证实频升 200 MHz**；非参数范围 |
   | L5 Zentwik 约定 | 字段 `fmaxOverrideMHz`（i16，单位 MHz） | Proposed；不与 `CurveOffsetStep` 互换 |

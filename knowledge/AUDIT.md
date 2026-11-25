@@ -105,7 +105,7 @@
 
 #### 6.2.1 缺少外部依据 / 被证伪 / 仅为推断的内容
 
-- **FMax / Boost Clock Override −1000…+200 MHz / 25 MHz**：此前标"Verified（SkatterBencher / MSI 官方）"。本轮核对 SkatterBencher 原文确认数字正确，但来源是**专业社区**，非 AMD 官方规范；且"每档 = N mV / up to 50 steps"的说法仅在另一篇（#69），不能张冠李戴。**降为 Inferred（社区原文已核对，非官方规范）**，见 `amd-smu.md` §9。
+- **FMax / Boost Clock Override −1000…+200 MHz / 25 MHz**：此前标"Verified（SkatterBencher / MSI 官方）"。本轮核对 SkatterBencher 原文确认数字正确，但来源是**专业社区**，非 AMD 官方规范；且"每档 = N mV / up to 50 steps"的说法仅在另一篇（#69），不能张冠李戴。**降为 Inferred（社区原文已核对，非官方规范）**，见 `amd-smu.md` §4/§9 与 `units.md` §4（本轮收尾已将 §4 分层表与 `units.md` 的旧 Verified 标注一并同步为 Inferred）。
 - **Intel 0x150 编码**：此前 AUDIT §2 称"经 linux-intel-undervolt 原文确认"。本轮打开原文发现作者自述**逆向工程、仅单机测试、无官方文档**，因此只能标 Inferred（社区逆向口径），不能当官方事实；此前 AUDIT §5.1 声称"IACR ePrint 2023/1679 与 Plundervolt 论文确认 plane 索引 bits[42:40]"——本轮未重新打开该论文逐字核对，**不维持 Verified，标 Inferred/待核**。
 - **AMD Ryzen Master 产品页/Release Notes、vectree.io、G-Helper**：此前来源表标"已访问 2026-11-25"，本轮**未重新打开原文**，保留引用但核验状态维持其原级别，不新增 Verified 结论。
 - **Curve Shaper 5×3=15 点**：此前标 Inferred。本轮从工具源码 352-365 行逐字确认结构，升级为 **Verified（工具源码事实，非 AMD 官方协议）**。
@@ -240,6 +240,10 @@
 - 内部链接检查（脚本）：见提交记录，失效 0。
 - 来源不明历史数据（`-11…-26`、14 可读核、bit23 平台拒绝、PDH 4000/s、15.6ms）：在 knowledge/ 中均标 Unknown/已撤回/报告称，无再被当作事实引用；research/ 原文保留但均带审计注记。
 - 核验等级：第 21 条已处理 Intel 0x150 的时效冲突；其余未见 Verified/Inferred 自相矛盾。
+  - **【本轮收尾补充】** 上句"其余未见自相矛盾"当时只核对了 Intel 0x150 的时效冲突，遗漏两处已降为 Inferred、却在引用点仍标 Verified 的等级不同步：
+    1. **FMax 范围 `-1000…+200 MHz / 25 MHz`**：§6.2.1 与 `amd-smu.md` §9 已降为 Inferred，但 `amd-smu.md` §4 分层表与 `units.md` §4 仍标 Verified。本次已把这两处统一为 Inferred（社区来源、非 AMD 官方规范），保留来源与适用范围，不影响 `amd-smu.md` 其他官方定义。
+    2. **Intel 电压偏移编码 S11.0.10 / ×1.024**：`intel-oc-mailbox.md` §4/§12 与 §6.2.1 已定为 Inferred（社区逆向），但 `units.md` S11.0.10 条目与 §4 总体等级仍把编码写成 Verified。本次已改为 Inferred（社区逆向口径），并区分"物理单位定义 = Verified"与"具体编码实现 = Inferred"，不降级整份单位文档。
+    - 此为**证据等级标注同步**，非技术结论变更；原审计历史与本段旧结论均保留。
 
 ### 9.4 新增开发前置规则
 
