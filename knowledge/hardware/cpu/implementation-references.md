@@ -159,7 +159,7 @@ public static uint MakePsmMarginArg(int margin) {
 
 ## 6. 未解决 / 需实机验证
 
-1. APOB 映射在 Zentwik 目标平台（Ryzen 9 9955HX / Fire Range）上是否可读、布局维度为何——本仓库无硬件、无原始 APOB dump，Unverified。
+1. APOB 映射在 Zentwik 目标平台（Ryzen 9 9955HX / Fire Range）上是否可读、布局维度为何——本仓库无原始 APOB dump。A1（2026-11-26）已确认**读取通道**问题：上游 `Apob` 经 `inpoutx64`/`WinIO` 读物理内存（扫描 `0xA200000`/`0x9F00000`/`0x4000000`），PawnIO 官方模块集不含物理内存读取，本机也未装 inpoutx64；因此 APOB 只能由外部提供的原始表进入。Zentwik 当前的替代来源见 [amd-smu.md](amd-smu.md) §3.1（CPUID 核号 + L3 域，单机已实测；是否等价于 APOB 物理核号仍 Unverified）。
 2. 修正为数值编码 + APOB 映射后，16 核是否全部可读写（用户报告"其他工具可改全核" = User-provided，未独立复核）。
 3. SMU Debug Tool −50/+30 界限来源（工具钳制 / 邮箱接受范围）——AUDIT §6/§7 待核。
 4. 各命令号在具体 SKU + AGESA 组合下的真实有效性——需逐平台回读矩阵，禁止单机外推。

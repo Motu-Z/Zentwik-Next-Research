@@ -306,3 +306,10 @@ SmuReader(门面/状态机)  →  SmuSession(命令语义)  →  SmuChannel(ioct
   - **【第六轮注记 2026-11-25：写 0 的语义】** 上条"把某核写成 0 不是恢复默认，只是取消出厂降压"中的"取消出厂降压"同样依赖已被撤回的"出厂非零"前提，一并不作为结论。就写入行为而言，写 0 = 设 0 档 = 无偏移（上游源码 Verified，见 [implementation-references.md](../knowledge/hardware/cpu/implementation-references.md) §3.2），在未调校的中性状态即为默认值；工具的"Zero all"即置 0，"ResetToBaseline"恢复的是读回基线而非某个非零出厂值。"厂商出厂普遍预置负 CO"无证据，不作常态假设。这与"读到非零/零都不能证明出厂状态"的读取语义是两个独立命题，见 [measurement-evidence-schema.md](../knowledge/data/measurement-evidence-schema.md) §1。
 - **`0x1AD` 的第二组**：`IntelMSR.p` 白名单包含 `0x150`、`0x1AD`、`0x650`、`0x1A4`，写入只对这些地址开放；在 AMD 机器上模块 `main()` 直接返回 `STATUS_NOT_SUPPORTED`（Win32 50），无法实测。
 - **Intel 通道已实现、未上机**：`IntelMsrTuningProvider` 读 `0x150`（11 位有符号、1/1024 V）与 `0x1AD`（1C/8C 倍频），电压偏移写入后回读比对；位域编解码有单测，真机行为待 Intel 机器验证。
+
+## 12. A1 注记（2026-11-26）：编码修正与核映射来源
+
+- 产品代码已删除独热位编码（`1<<(20+local)`）与"探测协商两种编码"的逻辑；掩码固定为 §3.1 的数值编码，物理位置一律由核映射给出：优先 APOB 原始表（`ZENTWIK_APOB_TABLE`），否则 CPUID `0x8000001E` 核号 + 系统 L3 缓存域，校验不过则整条通道报 `rejected`。
+- 本机（9955HX / Fam1Ah Model 44）只读实测：CPUID 核号 0–15、NodeId 恒 0；L3 域掩码 `0x0000FFFF` / `0xFFFF0000` → 2 CCD × 8 核 × 2 线程。即"核号是 die 内连续编号"，CCD 必须由缓存域切分。原始数据与遗留项见 [handoffs/A1-2026-11-26.md](handoffs/A1-2026-11-26.md)。
+- §11 中"bit23 不被邮箱接受""其余 14 核全部接受"均不得再作为平台事实引用；新证据反而与数值编码一致：当时被拒的两个掩码 `0x00800000` / `0x10800000` 按数值编码正好是越界核号（CCD0 核8、CCD1 核8）。掩码 `0x00000000` 被拒一事仍无解释，列为遗留项。
+- CO 读写在真机仍未验证（当前会话非管理员，PawnIO `privilegeMissing`）。不得把本节的拓扑结论当作 CO 可用的证明。
