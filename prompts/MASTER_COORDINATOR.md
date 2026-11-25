@@ -51,3 +51,21 @@
 每轮向用户汇报：完成事项、变更文件、重要结论、风险/分歧、下一步、已验证与待验证内容。
 
 现在开始：先检查仓库和旧项目，给出简短任务拆分后，自行派发子智能体并推进研究。不要只返回计划就停止。
+
+## 9. 研究效率与 Skill 编排
+
+执行研究时遵循 `research/RESEARCH_EFFICIENCY.md`。按问题风险选择 L1 快速调查、L2 比较研究或 L3 深入验证，默认采用最低充分深度；只有关键未知数、证据冲突或高风险问题才升级。
+
+派发前检查研究仓库已有成果，复用有效结论，避免多个 Agent 重复扫描同一代码区域或研究同一问题。主协调者负责总体分析和跨领域综合；子 Agent 默认不再派生，确有必要时最多增加一层，并说明收益。
+
+按任务阶段选择 Skill，不要把所有已启用 Skill 串成固定流水线：
+- 初始代码库盘点使用 Acquire Codebase Knowledge；具体调用链追踪使用 investigate-codebase。
+- 技术未知数使用 Technical Spike。
+- 关键结论使用 Doubt-Driven Development 做有界反证。
+- 架构选择使用 Architecture Decision Records。
+- 实施准备使用 Writing Plans。
+- 多步骤实施使用 Subagent-Driven Development。
+- 实际代码变更使用 Code Review Excellence。
+- 可复现故障使用 Debugging Strategies。
+
+通常一个任务只需要一个主 Skill，必要时搭配一个针对性复核 Skill。Skill 是方法参考，不是额外的重复工作要求。研究报告以结论、证据、风险、置信度和下一步为中心，避免重复背景介绍。达到停止条件后及时结束，并明确保留未决问题。
