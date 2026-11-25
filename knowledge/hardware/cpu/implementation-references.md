@@ -1,24 +1,60 @@
-# 成熟实现参考（CPU 调校工具）
+# 成熟实现参考（按开发领域索引）
 
-- 领域：`hardware/cpu`
 - 定位：**实现参考**，不是权威规范、不是 Zentwik 设计契约。目的是理解成熟工具"用什么方法、为什么这样、如何处理硬件/固件差异、如何做异常与边界、有哪些已知限制"，为 Zentwik 后续开发提供可评估的选项。
-- 核验状态：混合（见文末分项）
-- 本轮访问：2026-11-25，实际下载并逐行阅读上游源码（非 README/搜索摘要）
+- 标注：**【已研究】**＝本轮已逐行打开源码、结论见下文；**【仅建议】**＝只确认仓库存在与用途，未逐行研究、不作为技术结论来源。
 - 权威基础规范：[amd-curve-optimizer.md](amd-curve-optimizer.md)（CO 单一权威定义）、[amd-smu.md](amd-smu.md)（SMU/掩码/命令号单一权威定义）、[intel-oc-mailbox.md](intel-oc-mailbox.md)
 
 > 使用原则：源码行为只说明"该工具在该版本这样实现"，**不等于硬件事实、不等于 AMD/Intel 官方规范、不等于全平台通用**。一个工具的限制不得写成硬件限制（见 [measurement-evidence-schema.md](../../data/measurement-evidence-schema.md) §12）。所有命令号/编码以基础规范为准，本文引用不重抄数值表。
 
-## 1. 参考的上游项目与本轮实际访问位置
+## 1. 按开发领域的参考项目速查
 
-| 项目 | 类型 | 本轮访问的具体文件与行 | 用途 |
+只列值得借鉴的成熟项目；没有合适项目的领域留空。每项给出仓库、用途、可借鉴的具体实现点。
+
+### 1.1 AMD / Intel 硬件调校
+
+| 项目 | 状态 | 主要用途 | 值得 Zentwik 借鉴的具体实现 |
 |---|---|---|---|
-| `irusanov/ZenStates-Core`（dev） | 上游库（ZenTimings/ZenStates 共用） | `Hardware/Apob/ApobCoreMap.cs`（526 行，全文）；`Hardware/Smu/Commands/SetPsmMarginSingleCore.cs`、`GetPsmMarginSingleCore.cs`、`SetPsmMarginAllCores.cs`、`SetCurveShaperMargin.cs`、`GetCurveShaperMargin.cs`；`Hardware/Smu/Settings/Zen4Settings.cs`、`Zen5Settings.cs`；`Utils.cs:178-197`；`Cpu.cs`（`MakeCoreMask`/`MakeCoreMaskForLogicalCore`） | APOB 映射、CO/Curve Shaper 命令编码、世代命令号、写入参数编码（Verified 源码事实） |
-| `irusanov/SMUDebugTool`（master） | 维护者工具 | `SettingsForm.cs:2562-2584`（`EncodeCoreMarginBitmask`）、`:352-365`、`:507`、`:808-809` | CO 掩码独立印证、Curve Shaper 结构、工具输入上限（Verified 源码事实） |
-| `FlyGoat/RyzenAdj`（master） | 上游工具（跨平台） | `lib/api.c:1404-1479`（`set_coall`/`set_coper`/`set_cogfx`）、`:439-452`（`_do_adjust_psmu` 宏与响应分类）；`lib/ryzenadj.h:17-34`（家族枚举） | 按 CPU 家族分派命令号、响应码三态分类（Verified 源码事实） |
-| Linux kernel | 官方上游源码 | `arch/x86/include/asm/msr-index.h`（`MSR_RAPL_POWER_UNIT=0x606`、`MSR_PKG_POWER_LIMIT=0x610`、`MSR_PKG_ENERGY_STATUS=0x611`）；该文件**无** `MSR_IA32_OC_MAILBOX` | RAPL MSR 地址确认、OC Mailbox 非架构性佐证（Verified 源码事实） |
-| MSI FAQ-10122 / SkatterBencher / Intel SDM 镜像 / mihic linux-intel-undervolt | 厂商文档 / 专业社区 / 官方手册镜像 / 社区逆向 | 见 [AUDIT.md](../../AUDIT.md) §6.2 逐字核对记录 | CO 显示钳制、FMax、RAPL 单位、Intel 编码来源定性 |
+| [irusanov/ZenStates-Core](https://github.com/irusanov/ZenStates-Core) | 【已研究】 | APOB 映射、CO/Curve Shaper 命令编码 | 逻辑→物理核映射并跳过禁用核（§2）；16 位补码 margin 编码（§3.2）；全核/逐核分命令与世代分派（§3.1/§4） |
+| [irusanov/SMUDebugTool](https://github.com/irusanov/SMUDebugTool) | 【已研究】 | CO 掩码、Curve Shaper | `EncodeCoreMarginBitmask` 对 CO 掩码的独立实现（§2.3）；Curve Shaper 五频段结构与输入钳制（§3.6） |
+| [FlyGoat/RyzenAdj](https://github.com/FlyGoat/RyzenAdj) | 【已研究】 | 按 CPU 家族分派命令 | 家族枚举分派命令号；用 SMU 响应码区分"命令不存在"与"命令被拒"三态（§3.5/§4） |
+| [torvalds/linux](https://github.com/torvalds/linux) | 【已研究】 | RAPL MSR 地址 | `msr-index.h` 中 RAPL 三 MSR 地址；OC Mailbox 无架构性定义（§5） |
+| [mihic/linux-intel-undervolt](https://github.com/mihic/linux-intel-undervolt) | 【仅建议】 | Intel 电压偏移逆向 | Intel 0x150 电压编码思路（社区逆向、单机测试，仅 Inferred；见 [intel-oc-mailbox.md](intel-oc-mailbox.md) §4）——未逐行研究，仅作方向参考 |
 
-未在本轮逐行打开、因此不作为新结论来源：AMD Ryzen Master（闭源，仅有官方 FAQ/Release Notes）、UXTU、LibreHardwareMonitor 的 CO 路径（LHM 主要提供 PM Table 读取，逐核 CO 写入不是其主用途）。**未打开即不声称核验。**
+### 1.2 硬件监控与传感器采集
+
+| 项目 | 状态 | 主要用途 | 值得 Zentwik 借鉴的具体实现 |
+|---|---|---|---|
+| [LibreHardwareMonitor/LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) | 【仅建议】 | 硬件传感器读取、PM Table | C# 传感器抽象与采样组织方式。**未逐行研究**；其逐核 CO 写入不是主用途，不能作为 CO 写入参考 |
+
+### 1.3 Windows 服务与 IPC
+
+暂无合适的成熟参考项目，留空。旧版实现事实见 [research/03](../../../research/03-ui-ipc-deployment.md) 与 [security-service.md](../../windows/security-service.md)，本轮不新增外部项目。
+
+### 1.4 WPF / MVVM / UI
+
+| 项目 | 状态 | 主要用途 | 值得 Zentwik 借鉴的具体实现 |
+|---|---|---|---|
+| [CommunityToolkit/dotnet](https://github.com/CommunityToolkit/dotnet) | 【仅建议】 | WPF/.NET MVVM 工具包 | MVVM 命令/属性样板、源生成器用法。**未逐行研究**；Zentwik 已定 WPF 自绘图表，只参考 MVVM 工程结构，不引入第三方图表库 |
+
+### 1.5 进程管理与场景自动化
+
+暂无合适的成熟参考项目，留空。本领域的官方 API 事实（CPU Sets、电源方案）已在 `knowledge/windows/` 单独维护。
+
+### 1.6 插件与扩展机制
+
+暂无合适的成熟参考项目，留空。Zentwik 的进程外插件隔离属项目约定（见 [modules-capabilities.md](../../architecture/modules-capabilities.md)），不套用现成插件框架。
+
+### 1.7 已研究项目的逐行访问位置（证据留痕）
+
+| 项目 | 分支 | 具体文件与行 | 用途 |
+|---|---|---|---|
+| `irusanov/ZenStates-Core` | dev | `Hardware/Apob/ApobCoreMap.cs`（526 行，全文）；`Hardware/Smu/Commands/SetPsmMarginSingleCore.cs`、`GetPsmMarginSingleCore.cs`、`SetPsmMarginAllCores.cs`、`SetCurveShaperMargin.cs`、`GetCurveShaperMargin.cs`；`Hardware/Smu/Settings/Zen4Settings.cs`、`Zen5Settings.cs`；`Utils.cs:178-197`；`Cpu.cs`（`MakeCoreMask`/`MakeCoreMaskForLogicalCore`） | APOB 映射、CO/Curve Shaper 命令编码、世代命令号、写入参数编码（Verified 源码事实） |
+| `irusanov/SMUDebugTool` | master | `SettingsForm.cs:2562-2584`（`EncodeCoreMarginBitmask`）、`:352-365`、`:507`、`:808-809` | CO 掩码独立印证、Curve Shaper 结构、工具输入上限（Verified 源码事实） |
+| `FlyGoat/RyzenAdj` | master | `lib/api.c:1404-1479`（`set_coall`/`set_coper`/`set_cogfx`）、`:439-452`（`_do_adjust_psmu` 宏与响应分类）；`lib/ryzenadj.h:17-34`（家族枚举） | 按 CPU 家族分派命令号、响应码三态分类（Verified 源码事实） |
+| Linux kernel | — | `arch/x86/include/asm/msr-index.h`（`MSR_RAPL_POWER_UNIT=0x606`、`MSR_PKG_POWER_LIMIT=0x610`、`MSR_PKG_ENERGY_STATUS=0x611`）；该文件**无** `MSR_IA32_OC_MAILBOX` | RAPL MSR 地址确认、OC Mailbox 非架构性佐证（Verified 源码事实） |
+| MSI FAQ-10122 / SkatterBencher / Intel SDM 镜像 | — | 见 [AUDIT.md](../../AUDIT.md) §6.2 逐字核对记录 | CO 显示钳制、FMax、RAPL 单位、Intel 编码来源定性（文档，非源码） |
+
+未逐行打开、不作为结论来源：AMD Ryzen Master（闭源，仅官方 FAQ/Release Notes）、UXTU。
 
 ## 2. APOB 核心映射（重点主题）
 

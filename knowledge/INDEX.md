@@ -21,7 +21,7 @@
 - [AMD Curve Optimizer](hardware/cpu/amd-curve-optimizer.md) — **步进档位非 mV**；范围**不对称**（负向常见 −50、正向常见 +30），显示/工具/固件三层须区分；换算、误解、实测 · 混合
 - [Intel OC Mailbox](hardware/cpu/intel-oc-mailbox.md) — **11 位有符号 1/1024 V 定点、×1.024**；UVP、邮箱协议 · 混合
 - [AMD SMU 链路](hardware/cpu/amd-smu.md) — 邮箱命令号、核心掩码、世代绑定、权限、三态；**FMax Override -1000…+200 MHz / 25 MHz（上限非偏移）** · 混合
-- [成熟实现参考（CPU 调校）](hardware/cpu/implementation-references.md) — **上游源码逐行核对**：APOB 逻辑→物理核映射、CO 掩码完整链路、全核/逐核命令分派、16 位补码编码、响应三态、世代差异 · V/I（实现参考，非规范）
+- [成熟实现参考（按领域索引）](hardware/cpu/implementation-references.md) — **按开发领域列参考项目**（AMD/Intel 调校、监控、服务/IPC、WPF/MVVM、进程管理、插件；分【已研究】/【仅建议】）；AMD 项含**上游源码逐行核对**：APOB 映射、CO 掩码链路、全核/逐核命令分派、16 位补码编码、响应三态 · V/I（实现参考，非规范）
 
 ## 硬件 · 传感器与待研究
 
