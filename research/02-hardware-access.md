@@ -279,6 +279,8 @@ SmuReader(门面/状态机)  →  SmuSession(命令语义)  →  SmuChannel(ioct
 - **SYSTEM 令牌可以打开 PawnIO 设备**：`ZentwikAgent` 服务加载 `RyzenSMU.bin` 成功，SMU 测试消息 `0x01` 回 `2`、`ioctl_get_smu_version` 正常返回。此前"管理员 vs SYSTEM 的 ACL 行为未验证"一项，对 SYSTEM 成立。
 - **Fire Range 被模块当作 Granite Ridge**：`RyzenSMU.p` 的 `get_code_name` 把 `(1Ah<<8)|44h` 映射为 `CPU_GraniteRidge`，因此邮箱寄存器组是 `cmd 0x3B10524 / rsp 0x3B10570 / args 0x3B10A40`（与桌面 Zen4/5 同组）。这说明读 CO 的 `0xD5` 走的是 RSMU 邮箱，与工具链口径一致。
 - **`0xD5` 被 SMU 拒绝**：`tuning` 以掩码 `0x00000000`（核 0，序号编码）读 CO，模块返回 `STATUS_UNSUCCESSFUL` → Win32 31。按 `smu_status_to_nt` 反推，SMU 应答是 `0xFF`（`SMU_Failed`），不是 `0xFE`（未知命令，会得到 87）。即邮箱通、命令被拒。
-- **待判定**：拒绝原因是"核地址编码不对（0x00100000 独热位才是核 0）"还是"移动平台固件锁定 CO"。已改为探测阶段自动协商两种编码；两种都失败才判 `Rejected`，并把每次尝试的掩码与错误码写进明细。
+- **待判定（已收敛）**：拒绝原因是"核地址编码不对（0x00100000 独热位才是核 0）"还是"移动平台固件锁定 CO"。已改为探测阶段自动协商两种编码；两种都失败才判 `Rejected`，并把每次尝试的掩码与错误码写进明细。
+- **探测通过、整轮读取失败**：换上掩码协商版本后，探测用独热位 `0x00100000` 读核 0 被 SMU 接受，能力状态因此是 `degraded`（内部 `Available`）；而 `TryReadOffsets` 逐核扫 16 个物理核时某个核返回 `0xFF`，整轮读取失败，`tuning` 把"探测可用但读取失败"映射成 `rejected`。两条命令并不矛盾：前者只做核 0 探测，后者要求全核读完。
+- 结论修正：**不是移动平台整体锁死 CO**，核 0 的 `0xD5` 可读；失败点落在部分核。原先首错会覆盖逐核信息，已改为继续读其余核并汇总每个失败核的 `核号(掩码)`，下次运行即可判定是 CCD 位编码（核 ≥8 的 `(ccd<<28)|(1<<(20+local))`）不被接受，还是停泊核不应答。
 - **`0x1AD` 的第二组**：`IntelMSR.p` 白名单包含 `0x150`、`0x1AD`、`0x650`、`0x1A4`，写入只对这些地址开放；在 AMD 机器上模块 `main()` 直接返回 `STATUS_NOT_SUPPORTED`（Win32 50），无法实测。
 - **Intel 通道已实现、未上机**：`IntelMsrTuningProvider` 读 `0x150`（11 位有符号、1/1024 V）与 `0x1AD`（1C/8C 倍频），电压偏移写入后回读比对；位域编解码有单测，真机行为待 Intel 机器验证。
