@@ -1,6 +1,6 @@
 # ADR-003：进程与权限模型
 
-- 状态：Accepted（暂定）
+- 状态：Accepted（服务宿主与调用方校验已实现，安装实测待补）
 - 日期：2026-11-25
 - 相关：`research/04-tech-stack-evaluation.md`、`research/02-hardware-access.md`
 
@@ -30,3 +30,11 @@
 
 - 必须先验证（1 天）：服务安装/卸载、UI 连接、受限令牌下的授权测试、服务崩溃后 UI 行为。
 - 回滚条件：服务化导致安装失败率或调试成本不可接受。回滚目标为"每用户提权代理 + 计划任务自启"，但必须保留调用方校验。
+
+## 实施记录（M2）
+
+- `Zentwik.Agent --service`：`StartServiceCtrlDispatcherW` + `RegisterServiceCtrlHandlerExW` + `SetServiceStatus`；`Environment.UserInteractive` 为真时退回控制台，便于开发调试。
+- `--install-service` / `--uninstall-service`：`CreateServiceW` 自动启动、`LocalSystem`；安装时把当前用户 SID 写入 `owner.sid`，供管道放行判定。
+- 管道用 `NamedPipeServerStreamAcl.Create` + 显式 `PipeSecurity`：SYSTEM/Administrators 完全控制、AuthenticatedUser 读写、数据目录所有者完全控制。
+- 每个连接建立前校验调用方：`GetNamedPipeClientProcessId` → `OpenProcess` → `OpenProcessToken` → TokenUser / TokenElevation / TokenIntegrityLevel；拒绝 Session 0、低于 Medium 完整性、非 `owner.sid` 的调用方。
+- 仍未验证：真实 `sc create` 安装/卸载、Session 0 服务与用户会话的实际通信、受限令牌下的越权拒绝（需要另造一个降权进程做负向测试）。

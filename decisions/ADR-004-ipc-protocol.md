@@ -17,6 +17,12 @@
 - 背压：遥测在有积压时丢弃最新帧并计数，响应永不丢。
 - M1 用 `PipeOptions.CurrentUserOnly`；服务化后改为显式 DACL + 拒绝远程 + 校验调用方 SID/完整性级别/会话。
 
+## 协议 v2（M2）
+
+命令面从"状态/能力/设置/遥测"扩到完整产品面：`modules.list`、`plans.{get,save,delete,apply,revert}`、`scenes.{get,save,delete,activate,deactivate}`、`ledger.{list,release}`、`hardware.tuning.read`、`diagnostics.{doctor,log}`；事件新增 `scene.changed`。错误码按域前缀扩展（`plan.*`、`scene.*`、`ledger.*`、`hardware.*`）。
+
+已从 `CurrentUserOnly` 切换为显式 DACL + 调用方校验（见 ADR-003 实施记录）。测试仍直接跑真实管道，未降级为内存传输。
+
 ## 候选
 
 - **gRPC over named pipe**：成熟的多路复用与流，但引入 HTTP/2 依赖与代码生成，收益在当前数据量下不明显。
