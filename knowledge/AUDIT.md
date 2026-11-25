@@ -5,11 +5,13 @@
 - 目标：找出错误、过度概括、数值范围错误、单位错误、概念混淆；修正有充分依据者；不增加无意义文档
 - 方法：内置联网检索 + 权威原文交叉核验（AMD / Intel / Microsoft 官方、维护者源码、专业社区）
 - 说明：首轮用户指定的 /deep-research-pro、/tavily、/web-search-exa skill 当时未注册，故用等效检索完成；第二轮（见 §5）已用联网检索 + 厂商原文交叉核验。
-- 第二轮复审：2026-11-25（承接首轮，聚焦首轮未发现的错误与用户新增实测证据）
-- 第三轮专项审计：2026-11-25（实测数据真实性 + 外部研究质量，见 §6）
-- 第四轮专项审计：2026-11-25（实现错误误归因平台：bit23/核心掩码，见 §7）
-- 第五轮知识完善：2026-11-25（成熟实现参考：APOB 映射/CO 编码/命令分派，见 §8）
-- 第三轮专项审计：2026-11-25（用户设备实测数据真实性 + 外部资料研究质量；优先级高于新增知识）
+- 轮次时间线（均为 2026-11-25，按先后）：
+  1. 首轮审计（见 §1–§4）
+  2. 第二轮复审：承接首轮，聚焦首轮未发现的错误与用户新增实测证据（见 §5）
+  3. 第三轮专项审计：实测数据真实性 + 外部资料研究质量（见 §6）
+  4. 第四轮专项审计：实现错误误归因平台——bit23/核心掩码（见 §7）
+  5. 第五轮知识完善：成熟实现参考——APOB 映射/CO 编码/命令分派（见 §8）
+  6. 第六轮收尾核对：命题语义、一致性、时间线与开发前置规则（见 §9）
 
 ## 1. 审计发现与处理（首轮）
 
@@ -24,7 +26,7 @@
 
 ## 2. 复核后确认无误、不改的内容
 
-- **Intel OC Mailbox 0x150**：11 位有符号 S11.0.10、`code=mV×1.024`、字段 bit[31:21]、控制字 `0x80000[plane]1[R/W]` —— 经 `mihic/linux-intel-undervolt` 原文确认，与现有文档一致。
+- **Intel OC Mailbox 0x150**：11 位有符号 S11.0.10、`code=mV×1.024`、字段 bit[31:21]、控制字 `0x80000[plane]1[R/W]` —— 字段布局与现有文档一致。**【时效更新：本条首轮记为"经 mihic 原文确认"；第三轮（§6.2.1）复核该来源自述逆向单机、无官方文档，其编码层已降为 Inferred，不再属"经官方确认"。以 §6.2.1 与 `intel-oc-mailbox.md` §4/§12 为准】**
 - **Windows CPU Sets**：软亲和性、affinity mask 优先、多组不匹配忽略、Process Default 仅影响未显式设集合的线程 —— Microsoft 原文确认，一致。
 - **Windows 电源 API**：写值须 `PowerSetActiveScheme` 激活、`PowerEnumerate` 16/17/18 与 259(ERROR_NO_MORE_ITEMS)、RootPowerKey 为 NULL —— MS Learn 确认，一致。
 - **GPU / DDR5 内存**：均为待研究索引，无编造数值，保持 Unverified，不补写。
@@ -62,7 +64,7 @@
 
 - **RAPL 单位 1/2^n 及缺省值**：Intel SDM Vol.3B §14.9.2 / Figure 14-31 原文确认 PU=1/2^PU（缺省 0011b→1/8 W）、ESU=1/2^ESU（缺省 10000b→15.3 µJ）、TU=1/2^TU（缺省 1010b→976 µs）；首轮 §3 方向性修正正确，不改。
 - **FMax / Boost Clock Override −1000…+200 MHz / 25 MHz**：SkatterBencher #78/#92 原文确认"override the arbitrary clock frequency limit between −1000 MHz and +200 MHz in steps of 25 MHz"、"only adjusts the upper ceiling...doesn't act as a frequency offset"；Zen5 工具侧 1 MHz 粒度一致。首轮 §2 修正正确，不改。
-- **Intel OC Mailbox 0x150**：IACR ePrint 2023/1679 与 Plundervolt 论文确认 11 位有符号偏移在 MSR 0x150 bits[31:21]、单位 1/1024 V、plane 索引 bits[42:40]（core0/GPU1/cache2/uncore3/analog4）；LKML 明确无公开架构文档。现有文档一致，不改。
+- **Intel OC Mailbox 0x150**：11 位有符号偏移在 MSR 0x150 bits[31:21]、单位 1/1024 V、plane 索引 bits[42:40]（core0/GPU1/cache2/uncore3/analog4）；LKML 明确无公开架构文档。现有文档一致，不改。**【时效更新：本条第二轮记为"IACR ePrint 2023/1679 与 Plundervolt 论文确认"；第三轮（§6.2.1）因该轮未重开论文逐字核对，不维持 Verified，标 Inferred/待核。以 §6.2.1 为准】**
 - **`SYSTEM_CPU_SET_INFORMATION.Type` 为 4 字节**：Microsoft Learn winnt.h 结构确认 `DWORD Size` + `CPU_SET_INFORMATION_TYPE Type`（枚举，4 字节）。首轮 §5 审计注记正确，不改。
 - **GPU / DDR5 待研究索引**：无可靠资料，保持 Unverified、不编造数值，符合"不补写"原则，不改。
 
@@ -207,3 +209,40 @@
 3. SMU Debug Tool −50/+30 界限来源、各命令号在具体 SKU+AGESA 的真实有效性——需逐平台回读矩阵。
 
 本轮未修改旧版产品 `main`，未触碰产品仓库，未 force push；参数权威定义仍只在基础规范，新参考文档不重复维护数值表。
+
+---
+
+## 9. 第六轮收尾核对（2026-11-25）——命题语义、一致性与开发前置规则
+
+本轮不扩充知识、不研究产品源码，只做收尾核对：命题语义、时间线、三份 AMD 文档一致性、引用与历史数据、开发前置规则。
+
+### 9.1 修正的问题
+
+| # | 位置 | 问题 | 性质 | 处理 |
+|---|---|---|---|---|
+| 20 | `amd-curve-optimizer.md` §8/§12、`measurement-evidence-schema.md` §1、`research/02` §11 | "写 0 = 恢复默认"此前用"读到 0 ≠ 默认状态"（读取命题）来纠正（写入命题），二者答非所问；第一轮修正又过度防御，写成"写 0 = 恢复默认不成立（Unverified，因默认值 Unknown）" | **命题混淆 + 对称错误**：后者把"无证据的负面断言"当结论，与当初无据的"出厂非零"是同类错误，方向相反 | 按证据重写：写 0 = 设 0 档 = 无偏移（Verified 源码 `MakePsmMarginArg(0)=0`、`AllCcdZero_Click`），在未调校中性态即默认值；"厂商出厂普遍预置负 CO"无证据、不作常态假设；"读到 0/非零都不能证明出厂状态"为独立读取命题。research/02 历史条同样加第六轮注记 |
+| 21 | `AUDIT.md` 头部 | "第三轮专项审计"重复登记两次（第 9 行带 §6 引用、第 12 行无引用的早期残留） | **重复内容 / 时间线混乱** | 删除重复行，改为有序的六轮时间线列表（§9 为本轮） |
+| 22 | `AUDIT.md` §2、§5.1 | Intel 0x150 首轮记"经 mihic 原文确认"、第二轮记"IACR/Plundervolt 论文确认"，但第三轮已降为 Inferred/待核，旧结论未标时效 | **历史结论时效缺失**（易被后续 AI 误用） | 两条加【时效更新】注记，指向 §6.2.1 与 `intel-oc-mailbox.md` §4/§12 为当前准 |
+
+**"写 0"核验（本轮实际查看的上游源码）**：`SMUDebugTool/SettingsForm.cs` `AllCcdZero_Click:674-680`（每个启用核 `Value=0`）、tooltip `buttonZeroCS`（"Set all margins to 0"）、`ResetToBaseline:559-565`（恢复的是 `Tag` 里的读回基线，非固定非零出厂值）、`MakePsmMarginArg(0)=0`。MSI FAQ-10122 本轮重开，未提及"出厂默认 CO 值"（只有显示钳制 +30/−50），据实说明。
+
+### 9.2 三份 AMD 文档一致性核对（未发现矛盾，无需修订）
+
+交叉核对 [amd-curve-optimizer.md](hardware/cpu/amd-curve-optimizer.md)、[amd-smu.md](hardware/cpu/amd-smu.md)、[implementation-references.md](hardware/cpu/implementation-references.md) 四项技术定义：
+
+- **核心掩码**：三处一致——`[23:20]` 为 4 位数值字段（非独热位），`(ccd<<28)|((core%8)<<20)`，权威定义只在 amd-smu §3.1，其余引用。
+- **APOB 映射**：amd-smu §3.1 与实现参考 §2 一致——优先物理映射、跳过禁用核；无独立数值表重复。
+- **全核/逐核命令**：amd-smu §3 与实现参考 §3.1/§4 一致——Zen4/5 RSMU 逐核 0x06/全核 0x07、MP1 0x35/0x36。
+- **16 位补码编码**：amd-curve-optimizer §6、amd-smu §3.1、实现参考 §3.2 一致——掩码高 12 位 + margin 低 16 位补码 + [19:16] 保留。
+
+### 9.3 引用 / 索引 / 核验等级 / 历史数据核对
+
+- 内部链接检查（脚本）：见提交记录，失效 0。
+- 来源不明历史数据（`-11…-26`、14 可读核、bit23 平台拒绝、PDH 4000/s、15.6ms）：在 knowledge/ 中均标 Unknown/已撤回/报告称，无再被当作事实引用；research/ 原文保留但均带审计注记。
+- 核验等级：第 21 条已处理 Intel 0x150 的时效冲突；其余未见 Verified/Inferred 自相矛盾。
+
+### 9.4 新增开发前置规则
+
+[AI_GUIDE.md](../AI_GUIDE.md) 新增 §2A"开发前的参考实现研究"：编码前 6 步（理解需求→查规范→读用户提供的参考源码→对照旧版→多维权衡→简明评估）、硬性要求（实际读实现、不盲复制、许可证入评估、高低风险分级、消除根因而非堆补丁）。明确本章节仅在"修改/开发功能"任务触发，纯文档审计不触发——本次审计不阅读产品源码或参考项目源码。
+
+本轮未修改旧版产品 `main`，未触碰产品仓库，未 force push；未新增文档，只在既有文件内修订与追加。
