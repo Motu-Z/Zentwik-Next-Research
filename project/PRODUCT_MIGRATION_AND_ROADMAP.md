@@ -10,7 +10,7 @@
   - `research/01-legacy-inventory.md`
   - `research/handoffs/A1-2026-11-26.md`
   - `research/handoffs/接手核验-20261126.md`
-  - `LEGACY_POWER_CONTROL_INVESTIGATION.md`（旧版硬件功耗控制删除原因与平台证据调查）
+  - `research/LEGACY_POWER_CONTROL_INVESTIGATION.md`（旧版硬件功耗控制删除原因与平台证据调查）
 - 本文目的：确定新版产品能力的继承、迁移、重构和未来扩展路线。它不是重新立项，也不是要求重新设计已经存在的架构。
 - 修订记录：2026-11-26，根据 Gemini 对抗式评估调整 P0 顺序、迁移表范围、硬件验收边界、PawnIO 决策和 GUI 启动条件；随后按产品讨论进一步简化状态模型、自动化所有权、场景、监控、模块、Scheduling 和 GUI 的实施范围。
 - 修订记录：2026-11-26，根据旧版功耗控制调查，明确排除 CPU 硬件功耗墙写入，删除对应未来扩展项和重新调查待办；区分 Windows Power Plan 与硬件功耗控制，保留只读功耗监控，并将笔记本 HX 的通用 SMU 功耗写入列为不可靠路径、EC/GCU 列为有证据边界的工程推定；FMax 改为按平台能力提供。
@@ -235,7 +235,7 @@ Zentwik Next 不是从零开始的新产品。旧版 Zentwik 已经实现了大�
 6. 让 Intel 方案具备保存、应用、回读、恢复和启动策略；持久化能力必须按平台实际支持情况标记，不能假定旧版会话级功能天然支持重启重放。
 7. 对照旧版逐项保留防砖、启动应用、休眠恢复行为，并利用新版基线和账本改善状态判断。
 8. CLI 同步提供能力查看、基线查看、方案编辑、应用、恢复和结果明细。
-9. 旧版 CPU 硬件功耗限制（AMD PPT/TDC/EDC、STAPM/FAST/SLOW，Intel PL1/PL2/Tau）已完成历史与技术调查，决定不迁移、不列入近期或未来扩展路线，也不为其预留通用 Provider 写入抽象。调查依据与平台限制见 `LEGACY_POWER_CONTROL_INVESTIGATION.md`。
+9. 旧版 CPU 硬件功耗限制（AMD PPT/TDC/EDC、STAPM/FAST/SLOW，Intel PL1/PL2/Tau）已完成历史与技术调查，决定不迁移、不列入近期或未来扩展路线，也不为其预留通用 Provider 写入抽象。调查依据与平台限制见 `research/LEGACY_POWER_CONTROL_INVESTIGATION.md`。
 
 现有证据还支持一项产品层面的工程推定：笔记本 HX 平台不应默认具备通过通用 SMU Mailbox 直接修改功耗墙的能力；这条路径在笔记本固件上通常不可依赖，功耗管理更可能由厂商 EC/GCU 或其他专有控制链路承担。同方系目前已有的 GCU/MQTT 线索也指向厂商控制路径。但现有直接写入失败证据主要来自一台 9955HX，EC/GCU 侧尚无完整寄存器、协议和写入验证，因此不能表述为“所有 HX 绝对不能通过 SMU 写功耗”或“所有机型只能走 EC”。这项推定用于确定产品默认策略：不实现通用 HX SMU 功耗墙写入，也不把 EC 控制列为当前开发任务；未来只有具体型号具备可验证的厂商接口、安全回滚和真机证据时才单独评估。
 
