@@ -25,7 +25,7 @@
 | 5 | 电源方案 | `PowerPolicyService`、`PowerPolicyApi`（scheme CRUD + 8 策略项 AC/DC） | `Platform/Windows/Win32PowerPolicyService.cs`（GetActive/List/ListAll/SetActive/Read/Write/Duplicate/Rename/Delete/Enumerate/Description）、`Core/Power/PowerSchemeService.cs`、`Domain/Power/PowerSchemePresets.cs`；`PlanCoordinator.ApplyPower`；CLI `plans`/`power` | 已迁移：读策略/写策略/应用/激活 + scheme 增删改查（内置拒删、重名查重、活动先切走）；派生品不可见时回退「平衡派生 + 搬设置 + 搬说明」，对齐旧版规避策略；**隐藏方案（系统模板/被过滤方案）可列出（标 `hidden`）、可改名、可删除、可作模板** | 真实系统 create/rename/delete 闭环已验证（2026-11-26，执行后 `powercfg /L` 与执行前一致）；枚举/说明读写真机探针通过（19 子组 / 174 设置项）；隐藏方案读写与改名真机验证（2026-11-26，改完写回原值，可见性与活动方案均复原） | 策略项集合与逐项错误语义仍待核对；"隐藏派生"分支只有 fake 覆盖（本机无法复现隐藏模板） |
 | 6 | 进程调度 | `ProcessWatcher`、`CpuSetScheduler`、`ProcessPriority`、`NativeProcessList`、`MaskBinding` | `Platform/Windows/AffinityScheduler.cs`、`NativeProcessList.cs`、`CpuSetsNative.cs`、`CpuSetsCapabilityProbe.cs`；`Core/Scenes/SchedulingWatcher.cs`、`PlanCoordinator.ApplyScheduling/Enforce` | 已迁移（亲和性/优先级/CPU Sets、持续 enforce、漂移检测、PID 复用按创建时间、核心停泊提示） | 已验证（affinity `0xF:BelowNormal`、cpusets `0-3` 系统侧复核并可恢复） | >64 逻辑处理器/多组不支持（明确拒绝，KNOWN_LIMITS §8） |
 | 7 | 监控 | `ProcessRefresher`、`SmuReader` 快照 | `Platform/Windows/Win32TelemetrySource.cs`；`Core/Telemetry/TelemetryHub.cs`；CLI `monitor` | **部分**：CPU 总占用 + 内存；无温度/频率/功耗/GPU/磁盘/网络，无历史持久化 | 已验证（采样链路取到真实 CPU/内存） | P2 扩展指标；历史按需求 |
-| 8 | 场景自动化 | `ScenarioService`、`ScenarioMonitor`（4 触发：进程运行/退出/电池/交流） | `Core/Scenes/SceneEngine.cs`；`Domain/Scenes/Scene.cs`；CLI `scenes` | **部分**：触发/仲裁（优先级→进入时间→ID）/所有权/退出恢复/保存即重应用已迁移；触发器为 manual/process/powerSource **三类** | 已验证（fake 端到端：apply→账本→场景接管与回退；真机注册链路） | 核对"进程启动/退出"是否需拆为两种；条件/持续时间/组合未做（P2） |
+| 8 | 场景自动化 | `ScenarioService`、`ScenarioMonitor`（4 触发：进程运行/退出/电池/交流） | `Core/Scenes/SceneEngine.cs`；`Domain/Scenes/Scene.cs`；CLI `scenes` | **部分**：触发/仲裁（优先级→进入时间→ID）/所有权/退出恢复/保存即重应用已迁移；触发器四类 `manual`/`process`/`processExited`/`powerSource(ac\|dc)`，与旧版四种触发对齐（2026-11-26 补 `processExited`） | 已验证（fake 端到端：apply→账本→场景接管与回退；真机注册链路；真机进程退出触发→激活→保持→手动停用不复活，2026-11-26） | 条件/持续时间/组合未做（P2）；`processExited` 为一次性切换（保持不回退），语义已写入 knowledge/domain/scenes-arbitration.md |
 | 9 | 模块与能力发现 | `Capabilities/*`、`Modules/*`、`CapabilityIds` | `Core/Modules/ModuleCatalog.cs`、`Core/Capabilities/CapabilityService.cs`、`Domain/Capabilities/Capability.cs`、`Platform/Windows/WindowsCapabilityProbes.cs` | 已迁移（能力五态；跨厂商按任一适用聚合，另一厂商缺席不判降级） | 已验证（`caps` 真机 4/6 能力，`cpu-tuning` ready） | 无磁盘发现/启用禁用（旧版也无，非回归） |
 | 10 | 界面设置 | `UiSettingsStore`、`AppSettings` | `Domain/Settings/UserSettings.cs`、`Core/State/StateStore.cs`；CLI `settings` | 已迁移（语言/主题/强调色/缩放；单一写入方为 Agent） | 无需（纯软件） | 旧版设置分裂两进程的问题已消除 |
 | 11 | 日志诊断 | `LogService`、`LogOptions` | `Core/Diagnostics/DiagnosticLog.cs`、`DoctorService.cs`；CLI `logs`/`doctor` | 已迁移（分级、按天落盘、doctor 诊断） | 无需 | 结构化字段/操作 ID（旧版也无，非回归） |
@@ -39,8 +39,9 @@
 1. ~~**P1-B 补电源方案 CRUD**（#5）~~：已完成（2026-11-26，`power list/create/rename/delete` + `PowerSchemeService`）。剩余：核对策略项集合与逐项错误语义。
 2. ~~**P0-E PawnIO/APOB 决策记录**~~：已完成（2026-11-26，[ADR-008](../decisions/ADR-008-hardware-driver-and-apob.md)）。结论：唯一硬件驱动为 PawnIO + 官方签名模块，不引入第二驱动；APOB 不可读（PawnIO 模块无物理内存读，ZenStates-Core 走 inpoutx64 `MapPhysToLin`），核映射主路径改为 CPUID `0x8000001E` + L3 域。**遗留未完成项：分发合规**——仓库尚无 GPL-2.0/LGPL-2.1 文本与模块来源说明。
 3. **P0-D 硬件验证记录**：已分散在 `research/handoffs/M4-底层接手`，本表已汇总为"真机验证"列；如需独立证据文件再补。
-4. **P1-A 剩余：硬件功耗限制**（#3）：需产品确认范围（HX 默认隐藏、受控尝试）。
-5. **场景触发器核对**（#8）：确认 process 触发器是否覆盖"进程退出"。
+4. **P1-A 剩余：硬件功耗限制**（#3）：需产品确认范围（HX 默认隐藏、受控尝试）。**2026-11-26 产品决定：做成安装时可选组件，默认不勾选，勾选后允许写入。** 当前尚无安装器，先落运行时可开关的模块，安装阶段再接成向导勾选项。
+5. ~~**场景触发器核对**（#8）~~：已完成（2026-11-26，补 `processExited`，四类触发与旧版对齐）。
+6. **后台开销**：已按 `knowledge/architecture/polling-budget.md` 收敛（漂移核对 30 秒、空闲降频 20 秒、日志攒批刷盘）。受管进程的逐进程读回未优化，规则匹配大量同名进程时是下一个观察点。
 
 ## 阻塞项（缺条件，不在本轮）
 

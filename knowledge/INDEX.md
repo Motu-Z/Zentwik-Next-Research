@@ -42,6 +42,7 @@
 - [模块与能力](architecture/modules-capabilities.md) — 模块/能力/Provider/插件区分、五态 · P
 - [生命周期状态模型](architecture/lifecycle.md) — 模块/方案/通道/服务状态维度 · P/V
 - [IPC 契约与错误模型](architecture/ipc.md) — 帧格式、错误码、背压、退出码 · V
+- [轮询预算与后台开销](architecture/polling-budget.md) — **加周期性任务前必读**：旧版三次"定时器空转"教训、当前轮询拓扑表、实测 CPU 增量（空转 −75%、带负载 −36%）· V
 - [三种独立方案](domain/three-plans.md) — 三类领域对象、场景非第四方案 · P
 - [场景与仲裁](domain/scenes-arbitration.md) — 触发/优先级/确定性仲裁/退出恢复 · P
 - [状态账本与所有权](domain/state-ownership.md) — 前值/目标/实际/所有权/恢复资格 · P
