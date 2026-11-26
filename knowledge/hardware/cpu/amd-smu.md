@@ -6,7 +6,7 @@
 - 领域：`hardware/cpu`
 - 核验状态：混合（见分项）
 - 权威来源：RyzenSMU.p 上游模块源码；PawnIO 项目文档（签名模块、许可、反作弊）；SkatterBencher（PBO+ / Fmax Override 范围）、MSI 官方博客（25 MHz 步进、+200 MHz）；本仓库 `research/02-hardware-access.md` §2/§11
-- 相关文档：[amd-curve-optimizer.md](amd-curve-optimizer.md)、[security-service.md](../../windows/security-service.md)、[ENGINEERING_NOTES.md](../../ENGINEERING_NOTES.md) §2（PawnIO SDDL/IOCTL/`0x01` 语义/ioctl_send_smu_command 仅 RSMU/PCI 互斥，2026-11-26 上游源码逐字核验）
+- 相关文档：[amd-curve-optimizer.md](amd-curve-optimizer.md)、[amd-power-limit.md](amd-power-limit.md)、[security-service.md](../../windows/security-service.md)、[ENGINEERING_NOTES.md](../../ENGINEERING_NOTES.md) §2（PawnIO SDDL/IOCTL/`0x01` 语义/ioctl_send_smu_command 仅 RSMU/PCI 互斥，2026-11-26 上游源码逐字核验）
 
 ## 1. 定义与范围
 
