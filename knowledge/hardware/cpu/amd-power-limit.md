@@ -172,3 +172,21 @@ if ((raw & 0x80000) != 0 || (raw & 0x30000) == 0x30000) t -= 49
 - 模块分发与安装器合并处理：`AMDFamily17.bin` 与 `RyzenSMU.bin` 一起打包，安装阶段一次落位。
 - 已实测的传输语义写入本文，以后做这件事不再重测。
 
+### 8.5 实现落点（2026-11-27 完成）
+
+| 项 | 位置 |
+|---|---|
+| 换算 | `src/Zentwik.Platform/Windows/AmdSensorDecoder.cs`：温度 `(raw>>21)*0.125`，bit19 或 `[17:16]==0b11` 时 −49；能量差按无符号回绕；瓦 = 差值 × `2^-ESU` ÷ 秒 |
+| 通道 | `src/Zentwik.Platform/Windows/AmdSensorSource.cs`：独立 PawnIO 句柄加载 `AMDFamily17.bin`，SMN 读持 `Global\Access_PCI` |
+| 能力 | `monitor.telemetry.cpu.sensors`，归入 `monitoring` 模块（AnyOf：传感器缺席不影响系统遥测） |
+| 数据显示 | `TelemetryDto.TemperatureCelsius` / `PackagePowerWatts` / `SensorDetail`；CLI `zentwik monitor` |
+| 间隔 | 推送与传感器间隔各自可配（0 = 关闭传感器），边界见 `architecture/polling-budget.md` §9 |
+
+真机读数（本机 9955HX，管理员会话，2026-11-27）：空闲 71.8 °C / 39.4 W；16 线程忙循环下 80.3 °C / 67.9 W，与 §8.3 的独立实测一致。
+
+已知取舍：
+
+- 报的是 **Tctl**（k10temp 口径）。1600X/1700X/1800X/2700X/Threadripper 19xx-29xx 的 Tdie 修正（−20/−27/−10）未实现——这些型号不在本项目目标机范围，真要支持需按 CPU 型号名查表。
+- 封装功耗是**两次读取之间的平均值**，不是瞬时值；读取间隔越长，看到的越是平滑后的功耗。间隔拉到 30 秒时这个数字只能当趋势。
+- 每核功耗与频率仍未做（需绑核 + MPERF/APERF 差分，见 §8.4）。
+

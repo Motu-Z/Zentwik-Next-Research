@@ -54,7 +54,7 @@
 - `AffinityScheduler.TakeSnapshot` 建完字典后又整表复制一次为 `Dictionary<string, ProcessTarget[]>`，276 项约 20 μs、2 秒一次，占比 0.15%，评估后不改。
 - `state.json` 全量重写 + `FlushFileBuffers` 只在账本或配置真变化时触发；若将来出现"每轮都有变化"的路径，这是首先怀疑的地方。
 - 日志尚无旧版 `LogThrottle` 那类按"消息 + 时间窗"的重复抑制，只在刷盘频率上做了收敛。
-- 多个客户端同时订阅时各自采样一遍，`TelemetryHub` 没有按时间的采样缓存。当前采样本身已便宜，且实际场景很少多订阅者，未做。
+- ~~多个客户端同时订阅时各自采样一遍，`TelemetryHub` 没有按时间的采样缓存。~~ 2026-11-27 已按传感器间隔缓存：两次硬件读取之间沿用上一次读数（见 §9）。
 
 ## 6. 进程数与僵尸条目
 
@@ -81,3 +81,37 @@ Toolhelp 快照会列出已退出但对象尚未回收的进程（`ThreadCount =
 - 「旧版三次同类问题」= Verified（`Zentwik/CHANGELOG.md` 原文）。
 - 僵尸条目与进程数口径 = Verified（同时刻三方对照）。
 - 未优化项与观察点 = 明确未做，不是遗漏。
+
+## 9. 哪些间隔交给用户，哪些不给（2026-11-27 约定）
+
+判据只有一条：**改动只影响数据新鲜度与自身开销的，开放配置；会改变系统状态、仲裁结果或写入行为的，固定并写明理由。**
+
+### 9.1 开放（用户可改）
+
+| 间隔 | 位置 | 范围 | 默认 | 端点 |
+|---|---|---|---|---|
+| 监控推送间隔 | `UserSettings.MonitorIntervalMs` | 500–5000 ms | 1000 ms | `zentwik settings --monitor-interval`、`zentwik monitor --interval` |
+| CPU 传感器读取间隔 | `UserSettings.SensorIntervalMs` | 0（关闭）或 500–30000 ms | 1000 ms | `zentwik settings --sensor-interval`、`zentwik monitor --sensor-interval` |
+
+- 两者只决定"看到的刷新快慢"和"读硬件的次数"，不改变任何硬件或进程状态，改错最多是更耗电或数据更旧。
+- 命令行参数只覆盖本次订阅，持久值在设置里：`zentwik monitor` 不带参数时按设置采样。
+- 服务端把请求值夹到上下限并在 ack 里回实际生效值，客户端按 ack 算超时——不能用请求值，否则被抬到下限时会误报超时。
+- 传感器读硬件的成本比读系统计数器高一个量级（SMN 读要拿 `Global\Access_PCI` 互斥），所以传感器间隔独立于推送间隔：两次读取之间沿用上一次读数。
+
+### 9.2 不开放（保持内部固定）
+
+| 间隔 | 现值 | 不开放的理由 |
+|---|---|---|
+| 场景评估 + 调度纠偏 | 2 秒（无自动场景且账本空时降 20 秒） | 直接决定"进程启动到绑核"的延迟与场景切换的及时性；调坏会让用户以为绑定失败 |
+| 漂移核对 | 30 秒 | 改快等于按倍数重复读全部物理核（一笔 `cpu.co.*` 账本 16 核约 9 ms），是纯开销 |
+| 电源方案/功耗墙写入后的回读 | 立即 | 回读是写入正确性的一部分，不是可调参数 |
+| 进程计数的 2 秒 TTL | 2 秒 | 内部节流，不是采样语义；暴露出去只会让"进程数为什么没变"变成问题 |
+
+- 这些值都在源码常量里，改它们是改行为，须走评估而不是配置。
+
+### 9.3 落到实现的位置
+
+- 推送与传感器间隔：`TelemetryHub.RunSubscriptionAsync(intervalMs, sensorIntervalMs, …)`，`sensorIntervalMs = 0` 表示不读传感器。
+- 温度/功耗通道：`AmdSensorSource`（`ICpuSensorSource`），模块 `AMDFamily17.bin`，能力 `monitor.telemetry.cpu.sensors`。
+- 传感器通道另有 10 秒失败重试节流（会话/模块级失败时），同属内部开销控制，不开放。
+
