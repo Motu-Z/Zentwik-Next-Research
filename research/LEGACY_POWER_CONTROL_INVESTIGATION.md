@@ -168,7 +168,7 @@ TuningViewModel.Intel.cs → WorkerBridge.ApplyTuningAsync
 - APU 组：`0x14` / `0x15` / `0x16`
 - Fire Range / Dragon Range 组：`0x4F` / `0x3E` / `0x5F`（对应 `family=0x19,model=0x61` 与 `family=0x1A,model=0x44`）
 - APU 覆盖范围：`(0x17, 0x60/0x68/0x90/0x91/0xA0)`、`(0x19, 0x40/0x44/0x50/0x74/0x75/0x78)`、`(0x1A, 0x20/0x24/0x60/0x70)`
-- 未匹配任何一代 → `IsSupported=false`，整段 UI 不显示
+- 未匹配任何一代 → `IsSupported=false`，整段 UI 不显示（注：此为旧版实现行为；新版对 HX 策略已调整为默认不展示常规入口，但允许用户主动选择受控尝试）
 
 **【代码】读数**：`SmuSession.ReadPowerLimits()` 先 `SmuChannel.TryResolvePmTable()` 解析 PM 表 DRAM 地址（只解析一次），再 `TryReadPmTable(rows[64])`，用 `SmuPowerLimitCodec.FromWatts()` 把每个 qword 的低 32 位当 float 解码。对应 PM 表的 `float[0]` / `[2]` / `[4]`。
 
@@ -282,7 +282,7 @@ TuningViewModel.PowerLimits.cs → RefreshPowerLimitsAsync / ApplyPowerLimitsAsy
 | 厂商工具（RyzenAdj） | 【文档】用于**对照验证** PM 表读数索引 | 只作为参考实现，未集成为运行时依赖 |
 | OC 定频 | 【文档】实测 `0x6F`→`0xE6`、`0x2C` 不存在 | 不可行，已放弃；记录注明"不再试探 `0x29`" |
 | FMax 上限（`0x6E`/`0x70`） | 【用户确认】旧版长期使用未被拒；【代码】命令族与定频不同 | 可用，不属于受限通道，应正常迁移 |
-| 自研 SMU 层直写 | 【测试】实测写入被拒 `0xFD` | 本机不可行 |
+| 自研 SMU 层直写 | 【测试】（日志中记录、缺原始 `worker-*.log`）本机 9955HX 特定固件/命令组被拒 `0xFD` | 仅证实该设备、该固件下该命令组被拒，不外推至所有 HX |
 | PawnIO 多模块（Intel 侧） | 【未验证】AMD 机器上加载 `IntelMSR.bin` 返回错误 50 | 无 Intel 真机，无法验证 |
 | 阈值自动化（按功耗 / 温度触发） | 【文档】新版盘点确认无任何性能采样 | 未实现，属于路线图空位 |
 
@@ -341,7 +341,7 @@ TuningViewModel.PowerLimits.cs → RefreshPowerLimitsAsync / ApplyPowerLimitsAsy
 
 ### 6.2 CPU 硬件功耗控制（PPT / PL1 / 功耗墙 / 温度限制）
 
-- **是否迁移**：**按平台能力提供**。APU 与桌面端存在可用写入通道，纳入 CPU Tuning Plan；笔记本 HX 默认不提供。不整体排除，也不作为全平台通用能力。
+- **是否迁移**：**按平台能力提供**。APU 与桌面端按具体平台能力纳入 CPU Tuning Plan（不以外部工具支持代替本机实测）；笔记本 HX 默认不展示常规入口，但允许用户主动选择受控尝试。不整体排除，也不作为全平台通用能力。
 - **理由**：【测试】本机 Fire Range（HX）的 SMU 写入被固件拒绝，是**单机型、单固件版本、特定命令组**的证据，不能外推为所有移动平台；【外部实现】RyzenAdj 已在多代移动 Ryzen APU 上实现 STAPM/PPT/TDC/EDC 等功耗限制调整，证明移动平台存在可用 SMU 功耗控制路径，但其支持矩阵不能替代对本机 9955HX 的验证；【文档】Intel 侧从未真机验证，属未验证而非不可用；APU 命令组当年只做了代码与单测，没有本项目真机写入记录，平台可用性来自产品侧确认而非本报告复现。
 - **实现口径**：Provider 声明参数是否支持及取值范围。HX 默认不展示常规功耗墙控制入口；用户明确选择主动尝试时，允许进入受控探测/写入流程，先识别平台与命令支持状态，写入前明确风险，写入后检查响应和回读，遇到拒绝或异常立即停止并报告。不得把主动尝试变成无条件批量写入。不新建覆盖所有平台的通用功耗框架，参数挂在已有 CPU Tuning Plan 下。
 - **验证前提**（逐平台，不要求全部满足）：
@@ -414,7 +414,7 @@ TuningViewModel.PowerLimits.cs → RefreshPowerLimitsAsync / ApplyPowerLimitsAsy
 2. **实测限制**只有一条硬证据：本机 Fire Range 上 PM 表读数正常，SMU 功耗写入被固件拒绝（`0xFD`，`REP_MSG_CmdRejectedPrereq`）。
 3. **EC 只做了路径识别**（机械革命 GCU MQTT），没有任何实现、寄存器资料或读写测试；"EC 在外层限得更低"是解释性推断。
 4. **最终删除**发生于 2026-11-21（commit `348712a`，tag `v2.6.0-can7`），是技术受阻叠加产品取舍的主动决策，覆盖 AMD 与 Intel 全部功耗限制，永久移除；Intel 侧是未验证即一并移除，不是实测失败。
-5. **Windows 电源计划管理完整保留**，属于 OS 层能力，应迁移；CPU 硬件功耗控制按平台提供（APU、桌面端），HX 默认不提供；厂商 EC 控制排除在新版路线图之外。
+5. **Windows 电源计划管理完整保留**，属于 OS 层能力，应迁移；CPU 硬件功耗控制按平台能力提供（APU、桌面端），HX 默认不展示常规入口但允许用户主动选择受控尝试；厂商 EC/GCU 控制暂不列为当前开发任务，仅在具体型号具备厂商接口、可验证写入、安全回滚和真机证据时才考虑。
 6. **FMax 不受阻**：9955HX 上被拒的是 OC 定频（`0x5A/0x5C/0x5D`），FMax 上限走 `0x6E`/`0x70`，旧版长期可用；原报告把两者合并为"同源受限"属错误结论，已撤回。
 7. 报告中所有引用的提交号、tag、代码路径均已通过 Git 现场核对；无法核实的证据缺口已在第 7 章逐条列明。
 
@@ -426,10 +426,11 @@ TuningViewModel.PowerLimits.cs → RefreshPowerLimitsAsync / ApplyPowerLimitsAsy
 **2026-11-26，产品负责人勘误。** 以下两处原结论不成立，正文已就地修正：
 
 1. **撤回"分核 FMax 与 OC 定频同源受限"。** 9955HX 上被固件拒绝的只有 OC 定频（`0x5A/0x5C/0x5D`，配合 `0x6F`→`0xE6`、`0x2C` 不存在）；FMax 上限走 `0x6E`/`0x70`，旧版长期可用。涉及 §3.3、§4.2、§6.4、§9。原推断把"频率上限个性化"整体判死，属跨命令族的错误合并。
-2. **撤回"CPU 硬件功耗控制整体排除"。** 改为按平台提供：APU 与桌面端存在可用通道，纳入 CPU Tuning Plan；笔记本 HX 默认不提供。涉及 §6.2及 §7 第 4 条、§9。原结论把单台 HX 的写入被拒外推为全平台不可用。
+2. **撤回"CPU 硬件功耗控制整体排除"。** 改为按平台能力提供：APU 与桌面端按平台能力纳入 CPU Tuning Plan；笔记本 HX 默认不展示常规入口，允许用户主动选择受控尝试。涉及 §6.2、§7 第 4 条、§9。原结论把单台 HX 的写入被拒外推为全平台不可用。
 3. 证据分级新增 **【用户确认】**，用于区分产品负责人确认的既有行为与实测、文档记录。
 
 **未改动部分**：历史删除事实（提交号、删除范围、tag）、9955HX 写入返回 `0xFD` 的记录、Windows 电源计划完整保留的结论、EC/GCU 仅完成路径识别的判断。
+
 
 ---
 
