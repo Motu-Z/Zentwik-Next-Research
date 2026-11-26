@@ -295,3 +295,11 @@
 新增条目：PawnIO 协议/SDDL/IOCTL → [ENGINEERING_NOTES.md](ENGINEERING_NOTES.md) §2（实现参考，非规范）；Windows 工程约束 → 同文件 §1/§4。参数权威定义（CO/FMax/Intel 电压/RAPL 单位）位置不变，见 §3。
 
 本轮未修改产品仓库、未触碰 A1 代码、未参与 M4 开发、未 force push；所有改动仅在本研究仓库的文档。
+
+
+## 10.5 第八轮：FMax 移动平台支持范围与零值语义勘误（2026-11-26）
+
+- **撤回**“FMax 在部分移动平台不实现”这一概括。追溯发现它来自旧研究文档对 SmuReader.cs 基线零值分支的解释，没有给出具体移动 SKU、固件版本、原始命令响应或实测记录，证据不足。
+- **一手代码事实**：旧版 `SmuSession.GetFMax()` 在 `GetBoostLimit` 命令号为 0，或 `_channel.TrySend(...)` 返回 false 时，都会返回 0；该 API 把“命令未配置”和“发送失败”合并。旧版 `TuningStore.ResetToFactory()` 的注释明确规定，基线 0 表示“基线未知”，应跳过 FMax 写回，而不是表示平台不支持。旧版 `SmuMessages.For()` 对 Zen2/Zen3 的 `SetBoostLimit=0` 只说明该版本代码未配置对应写命令，不能外推为一类移动平台的硬件限制。
+- **外部反证**：FlyGoat/RyzenAdj 上游 README 将其定位为 Ryzen Mobile 电源管理调整工具，并实现 STAPM、PPT FAST/SLOW、TDC、EDC 等功耗/电流限制；其 Supported Models 列出多个移动 APU 家族。该事实否定“移动 Ryzen 平台普遍没有 SMU 功耗调整通道”，但不代替对特定 HX SKU 的验证。
+- **处理**：已修订 `research/02-hardware-access.md`、`knowledge/hardware/cpu/amd-smu.md`、`research/LEGACY_POWER_CONTROL_INVESTIGATION.md` 与 `project/PRODUCT_MIGRATION_AND_ROADMAP.md`。今后区分命令未配置、SMU 明确拒绝/不支持、通信失败、有效读数为零；不得把零值或探测失败直接升格为平台能力结论。
