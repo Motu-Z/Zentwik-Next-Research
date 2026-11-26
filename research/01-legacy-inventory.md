@@ -16,7 +16,7 @@
 
 | 领域 | 旧版实际实现 | 状态 | 关键证据 |
 |---|---|---|---|
-| AMD 调校 | 逐核 Curve Optimizer（-50..+50）、FMax（4450–5650MHz，步进约 25）；读快照、逐核写入+回读校验；开机静默应用、休眠恢复补写、防砖护栏；可存为调校方案并应用 | 已实现可用（需 PawnIO + 管理员 + AMD） | `Services/SmuReader.cs`、`Services/TuningApplyService.cs`、`Services/BootGuard.cs`、`Services/SleepResumeWatcher.cs` |
+| AMD 调校 | 逐核 Curve Optimizer（软件输入钳制 -50..+50）、FMax（特定机型观测的绝对频率区间 4450–5650MHz，步进约 25，不同于 Boost Clock Override 偏移）；读快照、逐核写入+回读校验；开机静默应用、休眠恢复补写、防砖护栏；可存为调校方案并应用 | 已实现可用（需 PawnIO + 管理员 + AMD） | `Services/SmuReader.cs`、`Services/TuningApplyService.cs`、`Services/BootGuard.cs`、`Services/SleepResumeWatcher.cs` |
 | Intel 调校 | MSR 三平面（Core/GPU/Cache）电压偏移 + 8 档倍频上限；逐平面写并回读（容差 2mV）、倍频一次性写但逐档比对，不一致判失败；`apply-intel-tuning` 支持 `restore` 回基线 | 部分实现：会话级能力，不进行方案保存，不进 `plans.json`，开机/休眠不会重放（启动路径只用 AMD 通道） | `Services/IntelTuningChannel.cs`、`Services/IntelTuning.cs`、`Modules/CpuVendorModules.cs:68`、`Worker/BackendHostService.cs:221` |
 | 电源方案 | 枚举/切换/派生新建/改名/删除 Windows 电源计划（内置方案禁删）；AC+DC 各 8 项策略：EPP、Boost、最大/最小处理器状态、散热方式、核心停泊下限、空闲禁用、ASPM；逐项写、逐项报错后重新激活 | 已实现可用（部分项随硬件缺失，快照按项给 supported/error） | `Services/PowerPolicyService.cs`、`Services/PowerPolicyApi.cs`、`Ipc/PowerSchemeListPayload.cs` |
 | 进程调度 | 按进程名匹配规则；CPU Sets 或 Affinity Mask 二选一下发；6 档优先级（含 EcoQoS，不含 RealTime）；1s 扫描、失败重试账本、漂移探测、PID 复用识别、解绑；自定义掩码最多 10 套 | 已实现可用；但单次写入只覆盖一个处理器组（>64 逻辑处理器直接拒绝） | `Services/ProcessWatcher.cs`、`Services/CpuSetScheduler.cs`、`Services/ProcessPriority.cs`、`Services/MaskBinding.cs:14` |
@@ -93,7 +93,7 @@
 
 1. **协议即功能清单**：每一版都是「加命令 / 改字段」，没有独立的契约版本或能力协商；`query-capabilities` 本身也要靠 v23 才能问出来，客户端无法在旧协议上发现新能力。
 2. **删除与回退是常态**：v5 删 `apply-process-priority`、v22 删掉 v21 刚加的 `query-power-limit`/`apply-power-limit`；说明功能在协议层被直接增删，不做弃用期。
-   - 功耗限制的状态需精确标注：曾实现（Intel `84bb998`、AMD `27dc193`，字段为持续/短时/平均 `stapm`/`fast`/`slow`，单位瓦），2.6.0-can7 由 `348712a` 整体移除、协议升到 22，**提交正文为空、未说明原因**。因此既不能当作现有能力，也不能推断为「已被证明不可行」。
+   - 功耗限制的状态需精确标注：曾实现（Intel `84bb998`、AMD `27dc193`，字段为持续/短时/平均 `stapm`/`fast`/`slow`，单位瓦），2.6.0-can7 由 `348712a` 整体移除、协议升到 22，**提交正文为空**（后续已通过工作日志调查还原决策背景，见 [LEGACY_POWER_CONTROL_INVESTIGATION.md](LEGACY_POWER_CONTROL_INVESTIGATION.md)）。因此既不能当作现有能力，也不能推断为「全平台技术上不可行」。
 3. **线格式会整体改写**：v19 掩码从整数数组改成 128 位十六进制串、v9 把方案拆成三类、v12 改掩码下发方式。这类改动一律靠「同版本安装」兜底，代价是任意一端混装即整机不可用（固定文案「UI 与 Worker 版本不一致，请重新安装」）。
 
 ## 3. 进程与权限边界事实
