@@ -2,7 +2,7 @@
 
 - 状态：Accepted（暂定，可替换边界见"验证与回滚"）
 - 日期：2026-11-25
-- 相关：`research/04-tech-stack-evaluation.md`
+- 相关：`research/04-tech-stack-evaluation.md`、`knowledge/ENGINEERING_NOTES.md` §8（NativeAOT 下 JSON 枚举转换器约束，2026-11-26 官方逐字核验）
 
 ## 背景
 
@@ -22,6 +22,8 @@
 
 正面：单一语言贯通、调试链路完整、既有领域知识可迁移。
 负面：GC 与 JIT 带来启动和内存开销；UI 不能 AOT；`unsafe` 面需人为收窄。
+
+**NativeAOT 序列化约束（2026-11-26 补充，官方一手核验，见 [ENGINEERING_NOTES.md §8](../knowledge/ENGINEERING_NOTES.md#8-nativeaot-下-json-枚举转换器)）**：特权服务计划 NativeAOT；若 IPC 控制面以字符串枚举表达字段，须用泛型 `JsonStringEnumConverter<TEnum>` 或 `[JsonSourceGenerationOptions(UseStringEnumConverter = true)]`，**非泛型 `JsonStringEnumConverter` 不被 NativeAOT runtime 支持**（官方逐字）。这不否定当前尚未启用 AOT 的 JIT 服务实现——该限制只适用于 NativeAOT 发布目标，不要把风险写成"已存在的错误"。
 
 ## 可替换边界
 

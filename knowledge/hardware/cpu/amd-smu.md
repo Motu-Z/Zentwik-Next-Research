@@ -6,7 +6,7 @@
 - 领域：`hardware/cpu`
 - 核验状态：混合（见分项）
 - 权威来源：RyzenSMU.p 上游模块源码；PawnIO 项目文档（签名模块、许可、反作弊）；SkatterBencher（PBO+ / Fmax Override 范围）、MSI 官方博客（25 MHz 步进、+200 MHz）；本仓库 `research/02-hardware-access.md` §2/§11
-- 相关文档：[amd-curve-optimizer.md](amd-curve-optimizer.md)、[security-service.md](../../windows/security-service.md)
+- 相关文档：[amd-curve-optimizer.md](amd-curve-optimizer.md)、[security-service.md](../../windows/security-service.md)、[ENGINEERING_NOTES.md](../../ENGINEERING_NOTES.md) §2（PawnIO SDDL/IOCTL/`0x01` 语义/ioctl_send_smu_command 仅 RSMU/PCI 互斥，2026-11-26 上游源码逐字核验）
 
 ## 1. 定义与范围
 
@@ -20,17 +20,34 @@ SmuReader（门面/状态机）→ SmuSession（命令语义）→ SmuChannel（
 ```
 
 - 设备路径 `\\?\GLOBALROOT\Device\PawnIO`；两个 IOCTL：加载模块、执行函数。
+  - **口径勘误（2026-11-26）**：`0x821`（加载）/ `0x841`（执行）是 `CTL_CODE(0xA1B2, func, METHOD_BUFFERED, FILE_ANY_ACCESS)` 的 **Function Code**，不是完整 IOCTL 值；完整值须按该宏计算。上游源码逐字见 [ENGINEERING_NOTES.md](../../ENGINEERING_NOTES.md) §2.2。
 - 请求体 = 32 字节 ASCII 函数名 + N×8 字节参数；返回体按 8 字节对齐回填。
 - 模块文件外置分发（`PawnIO/RyzenSMU.bin`），不内嵌单文件。
 
 ## 3. 命令号与世代绑定（Inferred 逆向口径 / 报告称，原始日志缺失）
 
-| 家族 | 型号 | SetMargin(CO写) | GetMargin(CO读) | GetBoostLimit | SetBoostLimit |
+| 家族 | 型号 | SetMargin(CO写) | GetMargin(CO读) | GetBoostLimit（读 FMax） | SetBoostLimit（写 FMax 上限） |
 |---|---|---|---|---|---|
 | 0x17 | Zen2 | 0x0A | 0x7C | 0x6E | 0x00（不支持） |
 | 0x19 | Zen3 | 0x0A | 0x7C | 0x6E | 0x00 |
 | 0x19 | Zen4 | 0x06 | 0xD5 | 0x6E | 0x70 |
 | 0x1A | Zen5 | 0x06 | 0xD5 | 0x6E | 0x70 |
+
+> **方向勘误（2026-11-26，本轮核验）**：正确方向是 **Get=0x6E / Set all cores=0x70**，`GetBoostLimit` 是**读**、`SetBoostLimit` 是**写**。本仓库该表自首版（提交 `4f60894`）起即为该方向，`research/02` §2.2 同向，**基线内不存在"Set=0x6E / Get=0x70 写反"的错误**。《Gemini 复审资料库 1》§2.1 声称本表写反，与本仓库实际内容及 Git 历史冲突，判定为**复审报告误读**，不采纳其"修正方向"建议（正确方向已在该表，见 `knowledge/AUDIT.md` §10 第 25 项）。本轮仍独立打开上游源码核验并固化证据如下。
+
+**FMax / BoostLimit 命令方向的一手证据（Verified 源码事实；作为芯片协议仍为 Inferred）**：
+
+- `irusanov/ZenStates-Core`（dev 分支）`Hardware/Smu/Settings/Zen4Settings.cs`：`Rsmu.SMU_MSG_GetBoostLimitFrequency = 0x6E;` 与 `Rsmu.SMU_MSG_SetBoostLimitFrequencyAllCores = 0x70;`（逐行打开，2026-11-26）。`Zen5Settings.cs` 仅 `class Zen5Settings : Zen4Settings`（只改 HSMP 地址），**继承**这两个命令号，方向不变。
+- 独立实现交叉证据：`leogx9r/ryzen_smu` `docs/rsmu_commands.md` 在 Matisse & Vermeer 表记 `GetMaxFrequency | 0x6E | Res0:MHz`（读返回 MHz），进一步印证 `0x6E = Get`。该文件为 Zen2/3 口径，未列 Zen4 的 0x70，故 0x70 的"全核写"以 ZenStates 源码为准。
+
+**命令变体区分（避免把 Get/Set all cores 与别的命令混用）**：
+
+| 变体 | Zen4 RSMU | 语义 | 证据 |
+|---|---|---|---|
+| `GetBoostLimitFrequency` | 0x6E | 读当前 Boost/FMax 频率上限 | ZenStates `Zen4Settings.cs`；ryzen_smu `GetMaxFrequency` |
+| `SetBoostLimitFrequencyAllCores` | 0x70 | 写**全部核心**的 Boost 上限（Zentwik FMax 写入用此命令） | ZenStates `Zen4Settings.cs` |
+| `SetOverclockFrequencyAllCores` / `PerCore` | 0x5F / 0x60 | 另一组 OC 频率命令（MP1 侧为 0x26 / 0x27），**与 0x70 不同**，不得混用 | ZenStates `Zen4Settings.cs` Overclock Options 段 |
+| Zen2/3 `SetBoostLimit` | 0x00（不支持） | 该世代仅见读命令 0x6E，无对应全核写命令 | 本表历史口径（Inferred，逆向） |
 
 Zen4/5 补充命令号（**Verified 上游源码** `Zen4Settings.cs`，本轮逐行核对；作为硬件协议 Inferred）：全核 CO `SetAllDldoPsmMargin` = RSMU `0x07` / MP1 `0x36`；逐核 MP1 侧 `SetDldoPsmMargin=0x35`；Curve Shaper `Set=0xA6` / `Get=0x84`。RyzenAdj 对 FireRange/DragonRange 的逐核 `0x06` / 全核 `0x07` 独立交叉印证。按家族分派的完整对照见 [implementation-references.md](implementation-references.md) §4。
 
@@ -97,4 +114,4 @@ Zen3/4/5 各一台的 CO/FMax 读写矩阵；S3/S4 恢复后是否丢 CO；PawnI
 
 ## 9. 核验状态分项
 
-命令号 = Inferred（逆向协议口径）；**核心掩码编码 `[23:20]` 为 4 位核内序号、非独热位 = Verified（外部源码 `Cpu.cs::MakeCoreMask` 与 `SettingsForm.cs` 逐字核对，见 §3.1）**；Zentwik 旧实现误用独热位 `1<<(20+local)` = Verified（源码比对），据此**撤回"平台拒绝 bit23"归因**（第四轮）；写入回读、权限 = 本仓库报告称，原始日志缺失、来源 Unknown（不得标 Verified 实测）；通道三态等设计原则 = Verified 设计决策；FMax Override 范围 -1000…+200 MHz / 25 MHz 步进、上限非偏移语义 = Inferred（专业社区 SkatterBencher 已逐字核对原文，非 AMD 官方规范）；家族误分类、Zen5 的 1 MHz 粒度 = Inferred；休眠清回出厂 = Unverified。
+命令号 = Inferred（逆向协议口径）；**FMax 方向 Get=`0x6E` / Set all cores=`0x70` = Verified 源码事实（ZenStates `Zen4Settings.cs` 逐行 + `Zen5Settings.cs` 继承关系 + ryzen_smu `0x6E GetMaxFrequency` 交叉，2026-11-26；见 §3 方向勘误）**，作为芯片协议仍为 Inferred，且本仓库基线自首版即正确、Gemini 报告的"写反"指控不成立；**其他 OC 频率变体 0x5F/0x60（RSMU）与 0x26/0x27（MP1）≠ 0x70 = Verified 源码事实（ZenStates `Zen4Settings.cs`）**；**核心掩码编码 `[23:20]` 为 4 位核内序号、非独热位 = Verified（外部源码 `Cpu.cs::MakeCoreMask` 与 `SettingsForm.cs` 逐字核对，见 §3.1）**；Zentwik 旧实现误用独热位 `1<<(20+local)` = Verified（源码比对），据此**撤回"平台拒绝 bit23"归因**（第四轮）；写入回读、权限 = 本仓库报告称，原始日志缺失、来源 Unknown（不得标 Verified 实测）；通道三态等设计原则 = Verified 设计决策；FMax Override 范围 -1000…+200 MHz / 25 MHz 步进、上限非偏移语义 = Inferred（专业社区 SkatterBencher 已逐字核对原文，非 AMD 官方规范）；家族误分类、Zen5 的 1 MHz 粒度 = Inferred；休眠清回出厂 = Unverified。

@@ -26,7 +26,13 @@ WPF + 自绘图表（`StreamGeometry` / `DrawingVisual`），不使用第三方�
 ## 候选与否决理由
 
 - **WinUI 3**：需 Windows App SDK 运行时与 MSIX/自包含打包；无内置托盘（产品需要）；数据密集表格口碑差；本机未验证构建。
-- **Avalonia 12**：保留为跨平台成为真实需求时的第一替代。其传递依赖 `Tmds.DBus.Protocol` 0.21.2 有 high 级漏洞（Windows 运行时不走该路径）。
+- **Avalonia 12**：保留为跨平台成为真实需求时的第一替代。
+  - **漏洞版本归因勘误（2026-11-26，一手核实）**：原表述"传递依赖 `Tmds.DBus.Protocol` 0.21.2 有 high 级漏洞（Windows 运行时不走该路径）"**归因错误且低估范围**，已更正：
+    - `0.21.2` 属于 **Avalonia 11.3.x**（`Avalonia.FreeDesktop/11.3.0 → Tmds.DBus.Protocol 0.21.2`，见 CommunityToolkit/Datasync#499 / PR#508 一手原文），**不是 Avalonia 12 的依赖**。
+    - **Avalonia 12.0.0** 实际搭载 `Tmds.DBus.Protocol 0.90.3`（官方 Release 原文 "Bump Tmds.DBus.Protocol to version 0.90.3"，2026-04-07），而 `0.90.3` 落在 GHSA-xrw6-gwf8-vvr9 受影响范围 `>= 0.22.0, < 0.92.0` 内，**同样受影响**；**12.0.1** 的 Security 条目 "Linux – Bump Tmds.DBus.Protocol to 0.92.0"（2026-04-13）才修复该漏洞。
+    - 漏洞：GHSA-xrw6-gwf8-vvr9 / CVE-2026-39959，High / CVSS 7.1，影响 `Tmds.DBus.Protocol < 0.21.3` 与 `>= 0.22.0, < 0.92.0`；修复版 `0.21.3`（11.x 回溯）与 `0.92.0`。来源：GitHub Advisory（2026-11-26 逐字核对）。
+    - **"Windows 不走 D-Bus 路径"需限定**：运行时层面 Windows 不加载 Linux D-Bus 后端成立；但 NuGet 审计按目标框架（TFM）的依赖图判断，与运行时 OS 无关，漏洞包仍进入 Windows restore 依赖图。默认 `NuGetAuditMode=direct` 不审计传递依赖，故通常不报；若改为 `all` 会报 NU1903。因此不能把"Windows 不走该路径"当作"无漏洞风险"的通用理由。
+  - 对决策的影响：WPF 选型结论不变；若未来回滚到 Avalonia，应指定 **12.0.1+** 并把 `NuGetAuditMode` 策略纳入评估，而非以 0.21.2/Windows 路径作为免除依据。
 - **Tauri 2**：需 Rust + WebView2，双语言边界落在最危险的硬件封送层；托盘/服务/驱动安装仍要 Win32。
 - **Qt 6**：无 SDK、LGPL 动态链接约束、C++ 维护成本；图表与原生性能优势在 10 Hz 下无意义。
 

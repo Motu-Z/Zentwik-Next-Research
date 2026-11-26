@@ -185,7 +185,7 @@ SmuReader(门面/状态机)  →  SmuSession(命令语义)  →  SmuChannel(ioct
 |---|---|---|---|---|---|
 | Intel 倍频/有效频率（0x198、0xE7/0xE8） | IOCTL + `rdmsr` | 5–20 µs | 随 P-state 变化，≥30Hz 有意义 | 10–30Hz | 调度时钟 ~15.6ms、P-state 跳变 |
 | Intel RAPL 功耗（0x611/0x639/0x641） | 累加器差分 | 5–20 µs | 短窗口量化噪声大 | 2–4Hz（窗口 ≥250ms） | 单位量化、累加器回绕 |
-| Intel 温度（0x1B1/0x19C） | DTS | 5–20 µs | ~1Hz 级 | 1Hz | 传感器内部刷新 |
+| Intel 温度（`0x19C` 核心级 / `0x1B1` 封装级） | DTS | 5–20 µs | ~1Hz 级 | 1Hz | 传感器内部刷新；两者层级不同，见 sensors/README §1.1 |
 | AMD 逐核 CO（0x7C/0xD5） | 每核一次 mailbox 事务 | 0.1–2 ms/核 | 不适用（配置读取） | 仅按需 | SMU 忙、PCI 轮询上限 8096 次 |
 | AMD PM table 温度/功耗 | transfer + 内存拷贝 | transfer 毫秒级、read 几十 µs | 由 SMU 采样节拍决定，约 1–10Hz | 2–4Hz（勿高频 transfer） | SMU 侧刷新周期 |
 | EC / 笔记本 EC | ACPI EC 字节事务 | 1–5 ms/字节 | ≤1Hz | 0.5–1Hz | ACPI 全局锁、SMI 抢占 |

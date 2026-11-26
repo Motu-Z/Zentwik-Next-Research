@@ -10,6 +10,7 @@
 - [单位与换算](data/units.md) — 电压/频率/功率/能量/时间/温度换算；RAPL 单位 1/2^n（非 2^n）、FMax 上限范围；CO 与 Intel 单位对照 · V/I
 - [序列化与持久化](data/serialization-persistence.md) — SchemaVersion、原子替换、多态、兼容性 · V
 - [专项技术事实审计记录](AUDIT.md) — 数值/单位/层级错误的审计发现与修正、单一维护点清单 · V
+- [工程约束与上游勘误补充](ENGINEERING_NOTES.md) — **跨领域避坑清单，非参数权威定义**：命名管道 MIC/`#123903`、PawnIO SDDL/IOCTL/RSMU 路径/PCI 互斥、服务恢复 flag、TPMI、WPF 渲染与 DataGrid 虚拟化、NativeAOT JSON；逐条标 Verified/Inferred/Unverified，附一手链接 · V/I/U
 
 ## 术语与命名
 

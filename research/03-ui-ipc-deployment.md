@@ -38,13 +38,15 @@
 | Intel 倍频（0x198） | 30–60Hz 才有意义；RAPL（0x611）需 ≥250ms 差分 | 滚动曲线 | **10Hz（倍频）/ 2–4Hz（功耗）** |
 | AMD PM table | 一次 transfer + memcpy，可批量 | 多核曲线 | **2–4Hz** |
 | SMU 逐核 CO（0x7C/0xD5） | 每核一次 mailbox，16 核一轮 1.6–32ms | 仅应用/校验 | **不用于遥测** |
-| 温度 / EC / 风扇 | 0x1B1 ~1Hz；EC 单字节 1–5ms；风扇受转速限制 | 数字 + 慢曲线 | **1Hz** |
+| 温度 / EC / 风扇 | Intel DTS ~1Hz（逐核 `0x19C` / 封装 `0x1B1`，见 sensors/README §1.1）；EC 单字节 1–5ms；风扇受转速限制 | 数字 + 慢曲线 | **1Hz** |
 
 **【已验证】** 旧版**没有周期遥测**：SMU 快照只在打开调校页/查询时按需读，`SmuReader.cs:345` 的"2 秒遥测定时器"是遗留注释。因此没有可继承的采样基线，订阅式遥测是新能力而非迁移。
 
 **【建议】** 验收基线：温度/EC 类 ≥1Hz（p99 ≤2s），其余通道 ≥4Hz（p99 ≤500ms）；渲染面 30/60Hz 允许重复帧与插值；**禁止把原始高频样本直接画线**（噪声会被误读为硬件抖动），必须先做窗口聚合或 min/max 抽稀。缺失超过 p99 阈值时显示"数据陈旧"标记，不插值冒充新值；离散量（电源方案、开关状态）用阶梯保持，连续量用线性插值，**不做外推**。
 
 **【建议】** 两个时钟必须分开：采样用 QPC + 高分辨率可等待定时器（`CreateWaitableTimerEx` + `HIGH_RESOLUTION`，避免 `timeBeginPeriod` 的全系统影响）；渲染用呈现时钟（WPF `CompositionTarget.Rendering`，按 Stopwatch 门限降到 30Hz）。用 `DispatcherTimer` 做 60Hz 采样既不准时也不均匀（实测 15.6ms 量级）。
+
+**【官方约束·2026-11-26】** Microsoft Learn 明确 *"The CompositionTarget.Rendering event causes WPF to continuously animate. If you use this event, detach it at every opportunity."*（该事件使 WPF 持续动画，应一有机会就注销）。窗口最小化、页面不活跃或无需刷新时注销订阅以节省资源属合理推导（Inferred，官方未逐字写"省电/最小化"）。原文与实现建议见 [ENGINEERING_NOTES.md §6](../knowledge/ENGINEERING_NOTES.md#6-wpf-渲染与节能)。
 
 ### 2.2 运行时与交互能力（强/够用/需自建/弱）
 
@@ -73,6 +75,7 @@
 
 - **图表瓶颈不在 GPU，在"每帧重建几何 + 绑定"**。可行路径：采样层 `float[]` 环形缓冲 → UI 只取最新快照（`Interlocked.Exchange` 双缓冲）→ 每帧一条 `StreamGeometry` + 按像素列 min/max 抽稀。禁止 `ItemsControl` 每点一元素、每秒数百次集合变更。
 - **表格**：进程 ≤ 2000 行用 `DataGrid` 行虚拟化即可；历史监控必须分页查询，不得整表入内存。
+  - **【已验证·2026-11-26 官方 API】** `EnableRowVirtualization` 注册默认 **true**（行虚拟化已默认开启），但 `EnableColumnVirtualization` 注册默认 **false**（列虚拟化默认关闭）。高密度多列监控表必须显式设 `EnableColumnVirtualization=true`，否则所有绑定列的单元格都会实例化。原文见 [ENGINEERING_NOTES.md §7](../knowledge/ENGINEERING_NOTES.md#7-wpf-datagrid-虚拟化默认值)。
 - **主题**是 WPF 最实在的优势：旧 `Tokens.Dark/Light.xaml` + `Accent.xaml` + 槽位替换**已验证**。
 - **i18n** 在所有 XAML 方案里成本相近（`x:Static` 到 resx 是静态的），不构成选型差异；方案见第 6 节。
 - **可访问性**：自绘图表必须实现 `AutomationPeer`，暴露"当前值摘要 + 数据表替代"；自定义焦点指示对比度 ≥ 3:1。
@@ -269,7 +272,13 @@ UI 侧同样有界：只保留"最新快照 + 环形历史"，渲染线程每帧
 | WiX v5（MSI+Burn） | 原生 | DifxApp | 事务性 | 强 | 好 | 陡 |
 | Inno Setup 6（旧） | `sc create` | 自定义 | 可用 | 弱（无 repair） | 一般 | 低 |
 | 自带 updater | 自建 | 不适用 | 强（灰度） | 依赖安装器 | 差 | 中高 |
-| MSIX | 不支持 | 不支持 | 强 | 强 | 好 | 与服务/驱动冲突，排除【推断】 |
+| MSIX | 有限支持（Win10 2004+） | 不支持 | 强 | 强 | 好 | 服务可打包，但驱动不可安装 → 排除【已验证文档】 |
+
+**MSIX 判定勘误（2026-11-26，Microsoft 官方原文核实）**：原表"MSIX 不支持服务与驱动"以偏概全，已更正：
+
+- **服务**：自 **Windows 10 版本 2004** 起，MSIX 支持打包含服务的包（官方 "Converting an installer with services - MSIX"：*"Windows 10, version 2004, introduces support for running an MSIX package that includes services"*）。限制：安装需管理员权限、不支持包外依赖（*"We currently do not support services with dependencies outside the package"*）、手动在 manifest 添加服务需受限能力（restricted capability）；服务启动账号/启动类型（Automatic/Manual/Disabled/Delayed）可在转换时配置。来源：learn.microsoft.com/en-us/windows/msix/packaging-tool/convert-an-installer-with-services（2026-11-26 逐字核对）。
+- **驱动**：官方 "MSIX Packaging Tool Known Issues and Troubleshooting Tips" 的 *Frameworks and drivers* 段原文：*"If your app requires a driver to install... MSIX currently does not support driver installation."*（未逐字限定 kernel-mode，但明确不支持驱动安装）。来源：learn.microsoft.com/en-us/windows/msix/packaging-tool/mpt-known-issues（2026-11-26 逐字核对）。
+- **对 Zentwik 的结论不变**：Zentwik 依赖 PawnIO 内核驱动，MSIX 无法承载驱动安装，故**排除 MSIX** 的最终产品决策成立；但理由必须是"不支持驱动安装"，**不能再说"不支持 Windows 服务"**。区分：服务支持（Win10 2004+ 有限支持）与内核驱动安装（不支持）是两种独立能力。
 
 **【建议】** WiX v5 + Burn（服务、可选驱动组件、运行时前置检查、MajorUpgrade 可回滚）。前提：接受 MSI 作者成本（WiX 4+ 为 dotnet tool，可在无 VS 的 runner 构建【推断】）；**驱动本体由 PawnIO 官方安装器/签名链负责**，我们只分发已签名模块，并在能力模型中如实标记"驱动未安装→该能力不可用"。PawnIO 安装需管理员、且可能被反作弊/安全软件拦截，因此 UI 必须把这种情况呈现为"单项能力不可用、其余功能正常"并给出获取/修复入口，**不得弹全局错误页或阻断启动**（依据 `02`）。若 v1 不落服务，则继续用 Inno。
 

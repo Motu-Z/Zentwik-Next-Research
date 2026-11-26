@@ -1,17 +1,18 @@
 # 专项技术事实审计记录（AUDIT）
 
-- 审计日期：2026-11-25
+- 审计日期：2026-11-25；第七轮补充 2026-11-26
 - 范围：`knowledge/` 规范群 + `research/` + `decisions/` + `project/` 全文档
 - 目标：找出错误、过度概括、数值范围错误、单位错误、概念混淆；修正有充分依据者；不增加无意义文档
 - 方法：内置联网检索 + 权威原文交叉核验（AMD / Intel / Microsoft 官方、维护者源码、专业社区）
 - 说明：首轮用户指定的 /deep-research-pro、/tavily、/web-search-exa skill 当时未注册，故用等效检索完成；第二轮（见 §5）已用联网检索 + 厂商原文交叉核验。
-- 轮次时间线（均为 2026-11-25，按先后）：
-  1. 首轮审计（见 §1–§4）
-  2. 第二轮复审：承接首轮，聚焦首轮未发现的错误与用户新增实测证据（见 §5）
-  3. 第三轮专项审计：实测数据真实性 + 外部资料研究质量（见 §6）
-  4. 第四轮专项审计：实现错误误归因平台——bit23/核心掩码（见 §7）
-  5. 第五轮知识完善：成熟实现参考——APOB 映射/CO 编码/命令分派（见 §8）
-  6. 第六轮收尾核对：命题语义、一致性、时间线与开发前置规则（见 §9）
+- 轮次时间线（按先后）：
+  1. 首轮审计（2026-11-25，见 §1–§4）
+  2. 第二轮复审：承接首轮，聚焦首轮未发现的错误与用户新增实测证据（2026-11-25，见 §5）
+  3. 第三轮专项审计：实测数据真实性 + 外部资料研究质量（2026-11-25，见 §6）
+  4. 第四轮专项审计：实现错误误归因平台——bit23/核心掩码（2026-11-25，见 §7）
+  5. 第五轮知识完善：成熟实现参考——APOB 映射/CO 编码/命令分派（2026-11-25，见 §8）
+  6. 第六轮收尾核对：命题语义、一致性、时间线与开发前置规则（2026-11-25，见 §9）
+  7. 第七轮：依据《Gemini 复审资料库 1》（2026-11-26）逐项独立核验、勘误与工程资料补充（见 §10）
 
 ## 1. 审计发现与处理（首轮）
 
@@ -250,3 +251,47 @@
 [AI_GUIDE.md](../AI_GUIDE.md) 新增 §2A"开发前的参考实现研究"：编码前 6 步（理解需求→查规范→读用户提供的参考源码→对照旧版→多维权衡→简明评估）、硬性要求（实际读实现、不盲复制、许可证入评估、高低风险分级、消除根因而非堆补丁）。明确本章节仅在"修改/开发功能"任务触发，纯文档审计不触发——本次审计不阅读产品源码或参考项目源码。
 
 本轮未修改旧版产品 `main`，未触碰产品仓库，未 force push；未新增文档，只在既有文件内修订与追加。
+
+---
+
+## 10. 第七轮（2026-11-26）——依据《Gemini 复审资料库 1》的独立核验、勘误与补充
+
+### 10.0 方法与原则
+
+用户要求不照抄 Gemini 结论：对其每一项技术主张逐条打开一手资料（官方开发者文档、GitHub Advisory、dotnet/runtime issue/源码、Linux 内核源码、上游项目源码）核验，区分 Verified / Inferred / Unverified；与一手资料冲突时以一手为准并记录。新增跨领域工程清单 [ENGINEERING_NOTES.md](ENGINEERING_NOTES.md)，不重复维护各领域参数权威定义。
+
+### 10.1 第一优先级：Gemini 指出的"高风险错误"核验结论
+
+| # | Gemini 主张 | 本轮独立核验 | 处理 |
+|---|---|---|---|
+| 25 | **AMD FMax 命令方向写反**（称 `amd-smu.md` 写为 Set=0x6E/Get=0x70） | **主张不成立**。Git 历史（`4f60894` 首版至今）与当前 `amd-smu.md` §3、`research/02` §2.2 全部为 `GetBoostLimit=0x6E / SetBoostLimit=0x70`，从未写反。一手源码 ZenStates-Core `Zen4Settings.cs` 逐行：`SMU_MSG_GetBoostLimitFrequency = 0x6E`、`SMU_MSG_SetBoostLimitFrequencyAllCores = 0x70`；`Zen5Settings.cs` 继承 Zen4 不改命令；`ryzen_smu docs/rsmu_commands.md` `GetMaxFrequency 0x6E Res0:MHz` 交叉印证。 | **不采纳"修正方向"**。但在 §3 补入一手证据、命令变体表（0x6E Get / 0x70 全核 Set；另有 OC 频率命令 0x5F/0x60 与 MP1 0x26/0x27 ≠ 0x70），明确方向并固化证据等级（源码 Verified / 硬件协议 Inferred）。错误来源 = Gemini 报告误读基线，影响 = 无实际错误写入风险，但补充后降低未来混淆风险。 |
+| 26 | **Intel 温度地址混淆**（`0x1B1` 被泛称 DTS） | 主张成立。`sensors/README.md` §1 把 `0x1B1` 写作"DTS"，易误读为逐核。Linux `msr-index.h` 逐行：`MSR_IA32_THERM_STATUS 0x19c`、`MSR_IA32_PACKAGE_THERM_STATUS 0x1b1`；前者核心级、后者封装级。 | 修正 `sensors/README.md`：拆分 `0x19C`（核心级）/`0x1B1`（封装级），新增 §1.1 层级表；同步 `research/02` §6 与 `research/03` §2.1 的同类表述。地址 = Verified 源码；采样率仍 = 机制推断。 |
+| 27 | **OC Mailbox Plane 3/4 跨代漂移** | 主张成立。`undervolt.py` `PLANES = {core:0,gpu:1,cache:2,uncore:3,analogio:4}`；`pyhwinfo msrbox.py` `MAILBOX_OC_DOMAIN_ID_RESERVED=0x03 # UNCORE`、`SYSTEM_AGENT=0x04`、`L2_ATOM=0x05`、`MEMORY_CONTROLLER=0x06`（来源注释为泄露 BIOS `CpuMailboxLib.h`）。 | 在 `intel-oc-mailbox.md` §2.1 按 Haswell–10th Gen / 12th Gen+ 分表，11th Gen 标 Unknown；明确现有 Core/GT/Cache 三平面不受影响、扩展 SA/Uncore 须按世代选表；源码事实 Verified、硬件协议 Inferred（非官方文档）。 |
+| 28 | **Avalonia 12 漏洞归因 0.21.2** | 部分成立但 Gemini 措辞需修正。GHSA 公告（2026-11-26 逐字）：`Tmds.DBus.Protocol` 受影响 `<0.21.3` 与 `>=0.22.0,<0.92.0`，修复 `0.21.3`/`0.92.0`，High/CVSS 7.1。`Datasync#499/PR#508`：`0.21.2` 属 `Avalonia.FreeDesktop 11.3.0`。Avalonia 官方 Release：12.0.0 "Bump Tmds.DBus.Protocol to version 0.90.3"（`0.90.3` **同样受影响**）、12.0.1 Security "Bump ... to 0.92.0" 才修复（PR 编号为 21122，非 Gemini 所写 21185，后者实为 discussion）。"Windows 不走 D-Bus 路径"仅运行时成立，NuGet 审计按 TFM 依赖图而非 OS。 | 修正 `ADR-002` 否决项与 `research/04` §4.3：0.21.2 属 11.3.x；12.0.0=0.90.3 也受影响；12.0.1+=0.92.0 修复；审计模式限定（默认 direct 不报传递依赖，all 会报 NU1903）；回滚应选 12.0.1+。全部 Verified（一手）。 |
+| 29 | **MSIX 不支持服务** | 主张成立但表述过全。Microsoft Learn "Converting an installer with services" 原文：*"Windows 10, version 2004, introduces support for running an MSIX package that includes services"*，限制含需管理员安装、不支持包外依赖、手动声明需受限能力；"MSIX Packaging Tool Known Issues" 原文：*"MSIX currently does not support driver installation."*（未逐字写 kernel-mode）。 | 修正 `research/03` §5 表格与判定：服务"有限支持（Win10 2004+）"、驱动"不支持"；排除 MSIX 的最终结论保留但理由改为驱动（PawnIO）。Verified（官方逐字）。 |
+
+### 10.2 第二优先级：工程资料补充（全部一手核验后纳入）
+
+新增 [ENGINEERING_NOTES.md](ENGINEERING_NOTES.md)，按证据等级逐条记录：命名管道 MIC 单向性 + `dotnet/runtime#123903`（issue open、PR #136870 未合并、2018 起受影响）；PawnIO SDDL `D:P(A;;GA;;;SY)(A;;GA;;;BA)`（INF 注册表项，非 `IoCreateDeviceSecure`）、IOCTL function code 0x821/0x841/0x861、`SMU_RETRIES_MAX=8096`、`SMU_OK=0x01`、`ioctl_send_smu_command` 经 `send_command` 走 RSMU 风格邮箱、MP1 须用 register read/write、`\\BaseNamedObjects\\Access_PCI` 互斥注释；OC Mailbox 互斥仅 pyhwinfo 一手确认；`SERVICE_FAILURE_ACTIONS_FLAG` 默认 FALSE 与"下次系统启动生效"；TPMI 与 MSR 并存且单位布局不同；WPF `CompositionTarget.Rendering` 官方建议、DataGrid 行/列虚拟化默认值；NativeAOT 非泛型 `JsonStringEnumConverter` 限制。交叉引用已加入 ADR-001/002/004、security-service、amd-smu、intel-oc-mailbox、research/03。
+
+### 10.3 低证据等级处理（不强行升级）
+
+[ENGINEERING_NOTES.md](ENGINEERING_NOTES.md) §12 对 Zen2/3 CO `0x0A/0x7C`、MP1 `0x35/0x36` 跨代、SMUDebugTool 钳位、9955HX APOB/16 核可写、`WR0_WaitPciBus`、互斥锁生态覆盖、TPMI 平台名单、D3D9On12、历史无日志实测、`0x610` 移除理由逐项写"已确认事实 / 现有证据 / 缺失证据 / 提升所需材料"，保持 Inferred/Unverified。**特别声明：Gemini 对 9955HX APOB 与全核可写的"认可"不是实机验证，不得升格。**
+
+### 10.4 与 Gemini 报告冲突的记录（以一手为准）
+
+| 冲突点 | 一手结论 | 处理 |
+|---|---|---|
+| FMax 命令方向写反 | 基线始终正确（Get=0x6E/Set=0x70），Gemini 误读 | 不采纳修正，补证据与变体表，记录于 §10.1 #25 |
+| PawnIO 用 `IoCreateDeviceSecure` | 源码用 `IoCreateDevice`；SDDL 在 INF | 不采纳，见 ENGINEERING_NOTES §2.1 |
+| `WR0_WaitPciBus` 互斥 | RyzenSMU.p 未找到，真实为 `\\BaseNamedObjects\\Access_PCI` | 前者标 Unverified，采用后者 |
+| "ioctl_send_smu_command 警告来自 Issue #20" | Issue #20 是 WinRing0 替代讨论；结论来自源码 | 出处更正为源码，结论方向保留 |
+| 服务恢复 flag"重启服务生效" | 官方"下次系统启动生效" | 更正措辞 |
+| Avalonia PR 编号 21185 | 12.0.1 Security 条目为 PR 21122；21185 是 discussion | 更正编号 |
+| Avalonia 12.0.0 已修复漏洞 | 12.0.0 的 0.90.3 仍受影响，12.0.1 才修复 | 修正归因 |
+
+### 10.5 单一维护点更新
+
+新增条目：PawnIO 协议/SDDL/IOCTL → [ENGINEERING_NOTES.md](ENGINEERING_NOTES.md) §2（实现参考，非规范）；Windows 工程约束 → 同文件 §1/§4。参数权威定义（CO/FMax/Intel 电压/RAPL 单位）位置不变，见 §3。
+
+本轮未修改产品仓库、未触碰 A1 代码、未参与 M4 开发、未 force push；所有改动仅在本研究仓库的文档。

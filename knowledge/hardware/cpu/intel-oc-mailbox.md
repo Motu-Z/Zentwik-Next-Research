@@ -14,7 +14,7 @@
   - Intel 官方支持文档：Undervolt Protection（UVP）。[中文页](https://www.intel.com/content/www/cn/zh/support/articles/000094219.html)、[非 K 处理器降压](https://www.intel.cn/content/www/us/en/support/articles/000094707/processors.html)
   - 主板厂商文档：ASRock UEFI 手册明确指出"核心/环形电压偏移以 mV 为单位，使用 Mailbox MSR 0x150，cmd 0x10/0x11"。[ASRock H610M 手册](https://download.asrock.com/Manual/BIOS/H610M-HDVM.2%20R2.0_UEFI_CN.pdf)
   - 本仓库一手资料：`research/02-hardware-access.md` §3、§11
-- 相关文档：[amd-curve-optimizer.md](amd-curve-optimizer.md)、[numeric-semantics.md](../../data/numeric-semantics.md)、[units.md](../../data/units.md)
+- 相关文档：[amd-curve-optimizer.md](amd-curve-optimizer.md)、[numeric-semantics.md](../../data/numeric-semantics.md)、[units.md](../../data/units.md)、[ENGINEERING_NOTES.md](../../ENGINEERING_NOTES.md) §3（互斥锁生态仅 pyhwinfo 一手确认）/§5（Meteor Lake+ TPMI 与 MSR 并存、单位布局不同，2026-11-26 核验）
 
 ## 1. 准确定义（外部技术事实）
 
@@ -27,6 +27,45 @@ Intel OC Mailbox 是 Intel 部分 CPU 上通过 MSR `0x150` 访问的一组**非
 - 平台：Haswell/Broadwell 到 Cometlake（4–10 代）的资料最完整（coreboot 驱动）；本仓库代码覆盖的域位来自社区口径，需按世代/固件交叉验证（Inferred）。
 - 第 12 代及以后：受 Undervolt Protection（UVP）约束，运行时降压在 UVP + VBS/HVCI 下不可用（Verified，Intel 官方文档）。
 - 非 K 锁定处理器：Intel 不提供降压控制工具；BIOS 是否开放取决于 OEM（Verified，Intel 支持文档）。
+
+### 2.1 电压域（Plane / Domain ID）映射按世代分表（**不得合并为通用表**）
+
+> **跨代勘误（2026-11-26）**：Plane 3/4 的语义在 12 代前后发生漂移。旧代写作 uncore/analogio 的通用表若沿用到 Alder Lake+ 会写入保留域或错误域。以下按两代分列，未覆盖代际标 Unknown。
+
+**Haswell – 10th Gen（`georgewhewell/undervolt` `PLANES` 字典，Verified 源码事实）**：
+
+```python
+PLANES = {'core': 0, 'gpu': 1, 'cache': 2, 'uncore': 3, 'analogio': 4,
+          # 'digitalio': 5, # not working?}
+```
+
+| Plane | 0 | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|---|
+| 语义 | Core | GT（GPU） | Cache（Ring） | **Uncore / System Agent** | **Analog I/O** | Digital I/O（源码注释 not working，未启用） |
+
+**12th Gen Alder Lake 及以后（`remittor/pyhwinfo` `msrbox.py` `MAILBOX_OC_DOMAIN_ID_*`，Verified 源码事实）**：
+
+```python
+MAILBOX_OC_DOMAIN_ID_DDR                = 0x00
+MAILBOX_OC_DOMAIN_ID_IA_CORE            = 0x00
+MAILBOX_OC_DOMAIN_ID_GT                 = 0x01
+MAILBOX_OC_DOMAIN_ID_RING               = 0x02
+MAILBOX_OC_DOMAIN_ID_RESERVED           = 0x03  # UNCORE
+MAILBOX_OC_DOMAIN_ID_SYSTEM_AGENT       = 0x04
+MAILBOX_OC_DOMAIN_ID_L2_ATOM            = 0x05
+MAILBOX_OC_DOMAIN_ID_MEMORY_CONTROLLER  = 0x06
+```
+
+| Plane | 0 | 1 | 2 | 3 | 4 | 5 | 6 |
+|---|---|---|---|---|---|---|---|
+| 语义 | IA Core（DDR 共用 0x00） | GT | Ring/Cache | **Reserved（源码注释仍写 UNCORE）** | **System Agent** | **L2 Atom（E-core L2）** | **Memory Controller** |
+
+**证据等级与限制（必须显式说明）**：
+
+- 两组映射均为**工具/逆向源码事实（Verified 源码存在）**，不是 Intel 官方公开规范。OC Mailbox 本身无公开架构文档（见 §1/§12）；pyhwinfo 源码注释明确其 Domain ID 来自"泄露的 BIOS 源码 `CpuMailboxLib.h`"（leaked BIOS sources），因此作为硬件协议仍是 **Inferred**，不得声称 Intel 官方定义。
+- pyhwinfo 源码中 `check_mailbox_mutex` 的 VF 读取用 `domain_list = [IA_CORE, RING, SYSTEM_AGENT, RESERVED]`，其中标签 `UNCORE` 对应的 DomainId 是 `0x03`（即 RESERVED）——这印证旧称"uncore"在 12 代+ 已改为保留域、System Agent 迁到 0x04；但源码把 `0x03` 仍标注 UNCORE，说明**命名与语义在工具内部也不完全一致**，按编号而非按名称使用。
+- **11th Gen（Rocket/Tiger Lake）未见一手映射**：不要推断它属于旧表还是新表，标 **Unknown / 待验证**。
+- **对 Zentwik 的影响**：当前 `voltageOffsetmV` 只覆盖 Core/GT/Cache 三平面（0/1/2），两代表在这三项一致，故现有参数与电压域描述**不受该跨代差异影响**；但若未来扩展 SA/Uncore 或内存控制器偏移，**必须按 CPU 世代选择对应 Plane 表**，12 代+ 不得沿用旧代 Plane 3（=Reserved），且 L2 Atom（0x05）/Memory Controller（0x06）仅在 12 代+ 出现。在任何代际实际写入前须真机回读验证（Inferred→实测）。
 
 ## 3. 技术行为（邮箱协议）
 
@@ -92,6 +131,8 @@ MSR、IA32_OC_MAILBOX (0x150)、电压平面（IA Core / GT / Cache）、Undervo
 |---|---|---|---|
 | Linux `msr-index.h` / LKML 讨论 | 官方源码 | 已访问 | 寄存器号、邮箱协议、无公开文档这一事实 |
 | coreboot OC Mailbox 驱动 | 维护者源码 | 已访问 | 逐平面偏移、支持世代 |
+| georgewhewell/undervolt `PLANES` | 维护者源码 | 已访问 2026-11-26 | 旧代 Plane 0–4：core/gpu/cache/uncore/analogio |
+| remittor/pyhwinfo `msrbox.py` `MAILBOX_OC_DOMAIN_ID_*` | 维护者源码 | 已访问 2026-11-26 | 12 代+ Plane 3=RESERVED、4=SYSTEM_AGENT、5=L2_ATOM、6=MEMORY_CONTROLLER；来源注释为泄露 BIOS `CpuMailboxLib.h` |
 | intel-undervolt / pyhwinfo | 维护者源码 | 已访问 | 11 位定点、S11.0.10、1.024 换算 |
 | Intel UVP 支持文档 | 官方 | 已访问 2026-11-25 | UVP/VBS 组合下运行时降压不可用 |
 | ASRock UEFI 手册 | 厂商文档 | 已访问 2026-11-25 | cmd 0x10/0x11、mV 单位（BIOS 侧表述） |
@@ -127,4 +168,7 @@ MSR、IA32_OC_MAILBOX (0x150)、电压平面（IA Core / GT / Cache）、Undervo
 | RAPL MSR 地址 0x606/0x610/0x611 | Verified（Linux kernel `msr-index.h` 本轮逐字核对）；单位公式见 [units.md](../../data/units.md) |
 | OC Mailbox 0x150 不在 kernel msr-index.h | Verified（本轮核对，佐证非架构接口） |
 | 命令字/域位跨世代通用性 | Inferred，须真实平台回读交叉验证 |
+| Plane 0/1/2 = Core/GT/Cache（旧代与 12 代+ 一致） | Verified 源码事实（undervolt `PLANES` + pyhwinfo `MAILBOX_OC_DOMAIN_ID_*` 两源一致）；作为硬件协议 Inferred |
+| Plane 3/4 跨代漂移（旧代 uncore/analogio；12 代+ Reserved/System Agent） | Verified 源码事实（上述两源分别逐行核对，2026-11-26）；作为硬件协议 Inferred（pyhwinfo 来源为泄露 BIOS 头） |
+| 11th Gen 的 Plane 3/4 归属 | Unknown / 待验证（未找到一手映射，不推断归属） |
 | 锁定状态回读行为 | Unverified |

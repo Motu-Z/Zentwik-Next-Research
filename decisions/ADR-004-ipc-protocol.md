@@ -23,6 +23,8 @@
 
 已从 `CurrentUserOnly` 切换为显式 DACL + 调用方校验（见 ADR-003 实施记录）。测试仍直接跑真实管道，未降级为内存传输。
 
+**切换决策的补充证据（2026-11-26，一手核验）**：`dotnet/runtime#123903`（issue open、修复 PR #136870 截至核验日未合并）确认 `PipeOptions.CurrentUserOnly` 自 .NET Core 2018 起误用 `WindowsIdentity.GetCurrent().Owner` 而非 `.User` 构建 DACL，在 LocalSystem 服务与管理员创建进程 owner SID 不一致时会误拒绝；且 MIC `NO_WRITE_UP` 只挡低→高，不能替代服务端显式 `TokenIntegrityLevel` 校验。二者共同支持本 ADR 从 `CurrentUserOnly` 迁移到显式 `PipeSecurity` + `NamedPipeServerStreamAcl.Create` 的决定。来源与准确措辞见 [ENGINEERING_NOTES.md §1](../knowledge/ENGINEERING_NOTES.md#1-windows-命名管道安全currentuseronly-的边界与已知-bug)。
+
 ## 候选
 
 - **gRPC over named pipe**：成熟的多路复用与流，但引入 HTTP/2 依赖与代码生成，收益在当前数据量下不明显。

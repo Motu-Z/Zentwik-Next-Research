@@ -6,7 +6,7 @@
 - 领域：`windows`
 - 核验状态：Verified（Microsoft API 语义 + 本仓库实现记录）
 - 权威来源：MS Learn（CreateNamedPipe、PIPE_REJECT_REMOTE_CLIENTS、GetNamedPipeClientProcessId、SECURITY_SQOS_PRESENT）；本仓库 `research/03-ui-ipc-deployment.md` §3/§4、ADR-003
-- 相关文档：[power-management.md](power-management.md)、[../architecture/ipc.md](../architecture/ipc.md)
+- 相关文档：[power-management.md](power-management.md)、[../architecture/ipc.md](../architecture/ipc.md)、[../ENGINEERING_NOTES.md](../ENGINEERING_NOTES.md)（管道 MIC 单向性、dotnet/runtime#123903、服务恢复 flag 生效条件；2026-11-26 一手核验）
 
 ## 1. 进程模型（项目决策，Accepted）
 
@@ -50,3 +50,8 @@
 ## 7. 核验状态
 
 API 语义 = Verified；真实 `sc create` 安装、Session 0→用户会话通信、受限令牌负向测试 = Unverified（当前会话非管理员，仅验证权限守卫分支）。
+
+## 8. 2026-11-26 补充约束（详见 ENGINEERING_NOTES.md）
+
+- **命名管道**：MIC 的 `NO_WRITE_UP` 只阻止低→高，不阻止高完整性客户端连接中完整性服务端；显式 `TokenIntegrityLevel` 校验不可省。`dotnet/runtime#123903`（截至核验日 issue open、修复 PR #136870 未合并）指出 `CurrentUserOnly` 误用 `WindowsIdentity.GetCurrent().Owner` 而非 `.User`，在 LocalSystem + 管理员创建进程的 owner SID 不一致场景会误拒绝——本仓库从 `CurrentUserOnly` 迁移到显式 `PipeSecurity` 的方向正确。详见 [ENGINEERING_NOTES.md §1](../ENGINEERING_NOTES.md#1-windows-命名管道安全currentuseronly-的边界与已知-bug)。
+- **服务恢复依赖前提（待办，不改产品代码）**：`SERVICE_FAILURE_ACTIONS_FLAG.fFailureActionsOnNonCrashFailures` 默认 FALSE 时，仅在进程未上报 SERVICE_STOPPED（崩溃）时触发恢复；要覆盖"上报 1066 非零退出码"的路径须置 TRUE，且官方明确"更改在下次系统启动时生效"。本仓库 §2/ADR-003 的恢复设计须显式记录该标志取值与生效延误。详见 [ENGINEERING_NOTES.md §4](../ENGINEERING_NOTES.md#4-windows-服务恢复service_failure_actions_flag)。
