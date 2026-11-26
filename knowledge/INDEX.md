@@ -22,7 +22,8 @@
 - [AMD Curve Optimizer](hardware/cpu/amd-curve-optimizer.md) — **步进档位非 mV**；范围**不对称**（负向常见 −50、正向常见 +30），显示/工具/固件三层须区分；换算、误解、实测 · 混合
 - [Intel OC Mailbox](hardware/cpu/intel-oc-mailbox.md) — **11 位有符号 1/1024 V 定点、×1.024**；UVP、邮箱协议 · 混合
 - [AMD SMU 链路](hardware/cpu/amd-smu.md) — 邮箱命令号、核心掩码、世代绑定、权限、三态；**FMax Override -1000…+200 MHz / 25 MHz（上限非偏移）** · 混合
-- [成熟实现参考（按领域索引）](hardware/cpu/implementation-references.md) — **按开发领域列参考项目**（AMD/Intel 调校、监控、服务/IPC、WPF/MVVM、进程管理、插件；分【已研究】/【仅建议】）；AMD 项含**上游源码逐行核对**：APOB 映射、CO 掩码链路、全核/逐核命令分派、16 位补码编码、响应三态 · V/I（实现参考，非规范）
+- [成熟实现参考（按领域索引）](hardware/cpu/implementation-references.md) — AMD/Intel 调校等项目的已研究源码证据与实现细节 · V/I
+- [跨领域参考项目目录](implementation-reference-catalog.md) — 进程、调度、电源计划、场景、监控、服务/IPC、插件、UI、CLI、安装维护等未来候选项目；区分已研究/待研究/功能对照，不代表必须引入
 
 ## 硬件 · 传感器与待研究
 
@@ -54,4 +55,5 @@
 | 接触外部 API/寄存器 | 对应规范 → 核对官方来源章节 → 成熟实现参考看工具怎么做 |
 | 做逐核调校/CORE 掩码/APOB 映射 | 成熟实现参考 → amd-smu §3.1 → amd-curve-optimizer |
 | 设计 IPC/持久化 | IPC 契约 → 序列化持久化 → 领域规范 |
+| 寻找进程/电源/监控/安装等第三方参考 | 跨领域参考项目目录 → 对应领域规范 → 按当前任务定点研究 |
 | 遇到规范冲突 | 报告冲突，不要自行补造约定（见 [AI_GUIDE.md](../AI_GUIDE.md)） |
