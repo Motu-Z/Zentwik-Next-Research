@@ -26,8 +26,9 @@ Zentwik Next 的产品定义、知识体系、技术预研、架构决策与原�
 ## 快速入口
 
 - **AI 使用者**：先读 [AI_GUIDE.md](AI_GUIDE.md)，再按 [knowledge/INDEX.md](knowledge/INDEX.md) 定位领域。
+- **产品目标与架构约束**：[project/PROJECT_BRIEF.md](project/PROJECT_BRIEF.md)、[project/ARCHITECTURE_CONSTRAINTS.md](project/ARCHITECTURE_CONSTRAINTS.md)。
+- **安装、部署与维护系统需求**：[project/INSTALLATION_DEPLOYMENT_MAINTENANCE.md](project/INSTALLATION_DEPLOYMENT_MAINTENANCE.md)。
 - **查技术术语/单位**：[knowledge/GLOSSARY.md](knowledge/GLOSSARY.md) 与 [knowledge/data/numeric-semantics.md](knowledge/data/numeric-semantics.md)。
-- **查产品目标与约束**：[project/PROJECT_BRIEF.md](project/PROJECT_BRIEF.md)、[project/ARCHITECTURE_CONSTRAINTS.md](project/ARCHITECTURE_CONSTRAINTS.md)。
 - **查原始研究证据**：[research/README.md](research/README.md)。
 - **查正式决策**：[decisions/](decisions/)。
 
