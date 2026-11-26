@@ -31,7 +31,7 @@
 | 11 | 日志诊断 | `LogService`、`LogOptions` | `Core/Diagnostics/DiagnosticLog.cs`、`DoctorService.cs`；CLI `logs`/`doctor` | 已迁移（分级、按天落盘、doctor 诊断） | 无需 | 结构化字段/操作 ID（旧版也无，非回归） |
 | 12 | 托盘 | `TrayHost` | 无 | 未实现 | 不适用 | 随 WPF/GUI 阶段（P4） |
 | 13 | 开机自启 | `AutoStartService`（schtasks） | 服务以 SCM 自动启动替代；无用户级"登录自启 UI" | 部分 | 已验证（服务 LocalSystem 自动启动） | 用户级自启随 GUI 阶段 |
-| 14 | 安装升级 | Inno 安装包 + 便携 zip | 无安装器（从构建输出注册服务） | 未实现 | 不适用 | P3；固定安装目录 + 打包 + PawnIO 分发决策 |
+| 14 | 安装升级 | Inno 安装包 + 便携 zip | 无安装器（从构建输出注册服务） | 未实现 | 不适用 | P3；固定安装目录 + 打包 + PawnIO 分发决策。**2026-11-26 产品决定：驱动不强制分发，用户自选装**（安装器不把 PawnIO 设为必需项） |
 | 15 | 单实例 | Worker/UI 双互斥体 | 服务单实例天然；客户端无状态 | 已迁移 | 无需 | — |
 
 ## 由本表导出的剩余开发任务（按优先级）
