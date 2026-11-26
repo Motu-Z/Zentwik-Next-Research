@@ -19,9 +19,10 @@
 | 漂移核对（`DetectDriftAsync`） | 30 秒（自 2026-11-26） | 有 `cpu.co.*` 账本时逐核读固件；逐项回读电源设置 | 无 |
 | 核心停泊读取（`CoreParkingPercent`） | 10 秒缓存 | 读一次电源设置项 | 无 |
 | 进程名快照（`AffinityScheduler.Find`） | 1 秒 TTL | Toolhelp 快照，只取 PID 与映像名，不 OpenProcess | 无 |
+| 遥测推流（`TelemetryHub`） | 客户端订阅，500–5000 ms | 采样 CPU/内存 + 进程计数；进程计数另有 2 秒 TTL | 无订阅者时完全不跑 |
 | 日志落盘 | 每 32 行 info；warn/error 立即 | `StreamWriter.WriteLine` + 条件 Flush | 无 |
 
-配置变更走信号唤醒（`NotifyConfigChanged`），不靠缩短间隔换响应速度。
+配置变更走信号唤醒（`NotifyConfigChanged`），不靠缩短间隔换响应速度。遥测只在客户端订阅期间运行，`zentwik monitor` 或桌面端关闭后归零。
 
 ## 3. 三条容易踩的坑
 
@@ -31,25 +32,52 @@
 
 **其三，逐行 Flush。** 每行日志一次系统调用，高频日志等于拿磁盘当水管用。info 攒 32 行刷一次，warn/error 立刻刷——出问题时最需要的是那两条，而稳态下产出最多的是 info。
 
-## 4. 实测（本机 9955HX / 16 核，2026-11-26）
+**其四，把"只是数一下"当成便宜操作。** 遥测里的进程数原先用 `Process.GetProcesses().Length` 取，单次微基准仅 0.43 ms，看起来可以忽略。但它在 500 ms 订阅下每拍执行一次，每次把全表 300 余个进程建成 `Process` 对象、分配约 360 KB，120 拍累计 40 MB 以上，把 Gen0 GC 拖成了持续开销。端到端实测比单次微基准重要：这一项占了订阅路径 43% 的成本。
 
-同一代理可执行文件，采样 60 秒 `TotalProcessorTime` 增量。折合单核占用按 16 核机器上的单核百分比计。
+**其五，让客户端决定服务端的采样频率而不设下限。** 订阅间隔下限曾是 200 ms，5 Hz 对界面毫无意义，成本却是 2 Hz 的 2.5 倍。下限收到 500 ms。
+
+## 4. 实测（本机 9955HX / 16 核 32 逻辑处理器，2026-11-26/27）
+
+同一代理可执行文件，采样 60 秒 `TotalProcessorTime` 增量。百分比指占**单个逻辑核**的比例，不是整机。
 
 | 场景 | 优化前 | 优化后 | 变化 |
 |---|---|---|---|
 | 空转（无场景、无方案、无账本） | 125.0 ms / 0.208% | 31.3 ms / 0.052% | −75% |
 | 一个自动场景 + 12 个受管进程 + 4 条 CO 账本 | 609.4 ms / 1.016% | 390.6 ms / 0.651% | −36% |
+| 500 ms 持续遥测订阅（120 拍） | 984.4 ms / 1.641% | 562.5 ms / 0.938% | −43% |
 
 说明：受管进程的读回（`OpenProcess` + 读亲和性 + 读优先级）属于 enforce 的必要成本，本次未优化。它按进程数线性增长，规则匹配大量同名进程（如 `svchost`）时是下一个观察点。
 
 ## 5. 未做但记在账上的
 
 - 每进程每轮两次 `OpenProcess`（读创建时间一次、读状态一次）可合并为一次，收益约每进程 10–20 μs，低于改动风险，暂不做。
+- `AffinityScheduler.TakeSnapshot` 建完字典后又整表复制一次为 `Dictionary<string, ProcessTarget[]>`，276 项约 20 μs、2 秒一次，占比 0.15%，评估后不改。
 - `state.json` 全量重写 + `FlushFileBuffers` 只在账本或配置真变化时触发；若将来出现"每轮都有变化"的路径，这是首先怀疑的地方。
 - 日志尚无旧版 `LogThrottle` 那类按"消息 + 时间窗"的重复抑制，只在刷盘频率上做了收敛。
+- 多个客户端同时订阅时各自采样一遍，`TelemetryHub` 没有按时间的采样缓存。当前采样本身已便宜，且实际场景很少多订阅者，未做。
 
-## 6. 核验状态
+## 6. 进程数与僵尸条目
 
-- 上表数字 = Verified（本机实测，两次采样各 60 秒，同机同构建）。
+Toolhelp 快照会列出已退出但对象尚未回收的进程（`ThreadCount == 0`），这类条目会让计数虚高，也会让调度对死 PID 反复 `OpenProcess` 失败。`NativeProcessList` 的计数与快照采集都按线程数过滤。
+
+口径变化：同样时刻，`Process.GetProcesses()` 报 276，Toolhelp 过滤后 309，`Get-Process` 306。原实现少报约 33 个（受保护/跨会话进程），新口径更接近任务管理器。
+
+## 7. 禁则（由测试强制）
+
+`tests/Zentwik.Core.Tests/PerformanceGuardTests.cs` 扫描 `src/` 全部源码（跳过注释与构建输出），出现下列 API 即测试失败：
+
+- `System.Management` / `ManagementObjectSearcher` / `ManagementObject`
+- `PerformanceCounter`
+- `GetProcessesByName` / `Process.GetProcesses`
+- `ServiceController`
+
+理由：这些 API 的代价不在单次调用，而在全局影响。WMI 会拉起 Winmgmt 并让调用方同步等待（旧版曾因调度用 WMI 查进程把系统拖到半崩）；`PerformanceCounter` 首次访问要加载计数器库；`GetProcessesByName` 每次枚举全表。约定一旦破，问题只在用户机器上以"卡顿"出现，等反馈已经太晚。
+
+另有一条不写成测试但同样成立的约束：**不要调用 `timeBeginPeriod`** 提高定时器精度。它会拉高全系统功耗与唤醒频率，收益仅是让 2 秒轮询更准时。
+
+## 8. 核验状态
+
+- 上表数字 = Verified（本机实测，每格两次采样各 60 秒，同机同构建）。
 - 「旧版三次同类问题」= Verified（`Zentwik/CHANGELOG.md` 原文）。
+- 僵尸条目与进程数口径 = Verified（同时刻三方对照）。
 - 未优化项与观察点 = 明确未做，不是遗漏。
