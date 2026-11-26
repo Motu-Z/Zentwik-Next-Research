@@ -1,4 +1,4 @@
-# Knowledge 主题索引
+﻿# Knowledge 主题索引
 
 按主题定位规范。状态缩写：Verified(V) / Inferred(I) / Proposed(P) / Unverified(U)。
 
@@ -43,6 +43,7 @@
 - [模块与能力](architecture/modules-capabilities.md) — 模块/能力/Provider/插件区分、五态 · P
 - [生命周期状态模型](architecture/lifecycle.md) — 模块/方案/通道/服务状态维度 · P/V
 - [IPC 契约与错误模型](architecture/ipc.md) — 帧格式、错误码、背压、退出码 · V
+- [安装器](architecture/installer.md) — Inno 6 选型理由与商业许可、服务逻辑单一实现、四条路径实测、BOM/pdb/等待语义等坑 · V
 - [轮询预算与后台开销](architecture/polling-budget.md) — **加周期性任务前必读**：旧版三次"定时器空转"教训、当前轮询拓扑表、实测 CPU 增量（空转 −75%、带负载 −36%）· V
 - [三种独立方案](domain/three-plans.md) — 三类领域对象、场景非第四方案 · P
 - [场景与仲裁](domain/scenes-arbitration.md) — 触发/优先级/确定性仲裁/退出恢复 · P
