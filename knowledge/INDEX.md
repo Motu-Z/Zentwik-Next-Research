@@ -22,7 +22,7 @@
 - [AMD Curve Optimizer](hardware/cpu/amd-curve-optimizer.md) — **步进档位非 mV**；范围**不对称**（负向常见 −50、正向常见 +30），显示/工具/固件三层须区分；换算、误解、实测 · 混合
 - [Intel OC Mailbox](hardware/cpu/intel-oc-mailbox.md) — **11 位有符号 1/1024 V 定点、×1.024**；UVP、邮箱协议 · 混合
 - [AMD SMU 链路](hardware/cpu/amd-smu.md) — 邮箱命令号、核心掩码、世代绑定、权限、三态；**FMax Override -1000…+200 MHz / 25 MHz（上限非偏移）** · 混合
-- [AMD 硬件功耗墙](hardware/cpu/amd-power-limit.md) — **RSMU `0x56/0xCB/0x57/0x58` 与 MP1 `0x4F/0x3E/0x5F` 不可混用**；PM 表须先 `0x03` 传输（因此**不**用于遥测）；写入按 `applied/diverged/accepted/rejected` 四态回读；本机 0.8 折算；**温度走 SMN `0x59800`、封装功耗走 RAPL `0xC001029B` 差分（已实现）** · 混合
+- [AMD 硬件功耗墙](hardware/cpu/amd-power-limit.md) — **RSMU `0x56/0xCB/0x57/0x58` 与 MP1 `0x4F/0x3E/0x5F` 不可混用**；PM 表须先 `0x03` 传输（因此**不**用于遥测）；写入按 `applied/diverged/accepted/rejected` 四态回读；本机 0.8 折算；**温度 SMN `0x59800`、封装功耗 RAPL `0xC001029B`、逐核频率 APERF `0xC00000E8` 差分（均已实现）** · 混合
 - [成熟实现参考（按领域索引）](hardware/cpu/implementation-references.md) — AMD/Intel 调校等项目的已研究源码证据与实现细节 · V/I
 - [跨领域参考项目目录](implementation-reference-catalog.md) — 进程、调度、电源计划、场景、监控、服务/IPC、插件、UI、CLI、安装维护等未来候选项目；区分已研究/待研究/功能对照，不代表必须引入
 

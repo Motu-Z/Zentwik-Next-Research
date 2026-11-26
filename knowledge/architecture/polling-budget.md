@@ -91,12 +91,14 @@ Toolhelp 快照会列出已退出但对象尚未回收的进程（`ThreadCount =
 | 间隔 | 位置 | 范围 | 默认 | 端点 |
 |---|---|---|---|---|
 | 监控推送间隔 | `UserSettings.MonitorIntervalMs` | 500–5000 ms | 1000 ms | `zentwik settings --monitor-interval`、`zentwik monitor --interval` |
-| CPU 传感器读取间隔 | `UserSettings.SensorIntervalMs` | 0（关闭）或 500–30000 ms | 1000 ms | `zentwik settings --sensor-interval`、`zentwik monitor --sensor-interval` |
+| CPU 传感器读取间隔（温度 / 封装功耗 / 逐核频率同一拍读） | `UserSettings.SensorIntervalMs` | 500–30000 ms | 1000 ms | `zentwik settings --sensor-interval`、`zentwik monitor --sensor-interval` |
 
 - 两者只决定"看到的刷新快慢"和"读硬件的次数"，不改变任何硬件或进程状态，改错最多是更耗电或数据更旧。
 - 命令行参数只覆盖本次订阅，持久值在设置里：`zentwik monitor` 不带参数时按设置采样。
 - 服务端把请求值夹到上下限并在 ack 里回实际生效值，客户端按 ack 算超时——不能用请求值，否则被抬到下限时会误报超时。
-- 传感器读硬件的成本比读系统计数器高一个量级（SMN 读要拿 `Global\Access_PCI` 互斥），所以传感器间隔独立于推送间隔：两次读取之间沿用上一次读数。
+- 传感器读硬件的成本比读系统计数器高一个量级（SMN 读要拿 `Global\Access_PCI` 互斥，逐核频率要绑核 16 次），所以传感器间隔独立于推送间隔：两次读取之间沿用上一次读数。
+- **节奏按拍数算，不按时间戳**：`(tick - 1) % round(sensor/interval) == 0`。用"距上次读取是否已满间隔"判断时，`PeriodicTimer` 抖到 994 ms 的那一拍会被判成未到点，实际变成两拍一读（传感器间隔 1 秒 → 真的 2 秒），2026-11-27 实测踩到。代价是传感器节奏被量化到整拍（1500 ms 传感器 + 1000 ms 推送 = 2 拍）。
+- 逐核频率单帧成本：空闲 0.23 ms（16 核 × 2 次 MSR 读 + 16 次绑核）；全核满载时绑核要等时间片，临时把采样线程提到 `Highest` 后从 50–160 ms 降到 0.4–1.2 ms，读完立即还原。
 
 ### 9.2 不开放（保持内部固定）
 
@@ -112,6 +114,6 @@ Toolhelp 快照会列出已退出但对象尚未回收的进程（`ThreadCount =
 ### 9.3 落到实现的位置
 
 - 推送与传感器间隔：`TelemetryHub.RunSubscriptionAsync(intervalMs, sensorIntervalMs, …)`，`sensorIntervalMs = 0` 表示不读传感器。
-- 温度/功耗通道：`AmdSensorSource`（`ICpuSensorSource`），模块 `AMDFamily17.bin`，能力 `monitor.telemetry.cpu.sensors`。
+- 温度/功耗/频率通道：`AmdSensorSource`（`ICpuSensorSource`），模块 `AMDFamily17.bin`，能力 `monitor.telemetry.cpu.sensors`；逐核频率在 `SampleClocks` 里绑核采样，与温度、封装功耗同一拍。
 - 传感器通道另有 10 秒失败重试节流（会话/模块级失败时），同属内部开销控制，不开放。
 
