@@ -241,6 +241,8 @@ TuningViewModel.PowerLimits.cs → RefreshPowerLimitsAsync / ApplyPowerLimitsAsy
 
 ### 3.4 限制范围：设备特有还是一类平台
 
+**【外部实现反证】RyzenAdj 并非只处理桌面端。**其上游 README 明确将项目定位为 Ryzen Mobile 电源管理调整工具，并提供 STAPM、PPT FAST/SLOW、TDC、EDC 等功耗/电流限制设置；Supported Models 表也列出 Raven、Picasso、Renoir、Lucienne、Cezanne、Rembrandt 等移动 APU 家族的参数支持情况。该资料足以否定"移动 Ryzen 平台普遍没有 SMU 功耗调整通道"这种概括，但不能单独证明每一款 HX、尤其本机 9955HX 的具体命令都可写。具体平台仍须按型号、固件与参数逐项验证。
+
 **【测试】已验证**：仅限本机 Fire Range（9955HX）在当时的 BIOS / 固件版本下。
 
 **【未验证】**：
@@ -338,8 +340,8 @@ TuningViewModel.PowerLimits.cs → RefreshPowerLimitsAsync / ApplyPowerLimitsAsy
 ### 6.2 CPU 硬件功耗控制（PPT / PL1 / 功耗墙 / 温度限制）
 
 - **是否迁移**：**按平台能力提供**。APU 与桌面端存在可用写入通道，纳入 CPU Tuning Plan；笔记本 HX 默认不提供。不整体排除，也不作为全平台通用能力。
-- **理由**：【测试】本机 Fire Range（HX）的 SMU 写入被固件拒绝，是**单机型、单固件版本**的证据，不能外推为所有平台；【文档】Intel 侧从未真机验证，属未验证而非不可用；APU 命令组当年只做了代码与单测，没有真机写入记录，平台可用性来自产品侧确认而非本报告复现。
-- **实现口径**：Provider 声明参数是否支持及取值范围；HX 上不做探测性写入。不新建覆盖所有平台的通用功耗框架，参数挂在已有 CPU Tuning Plan 下。
+- **理由**：【测试】本机 Fire Range（HX）的 SMU 写入被固件拒绝，是**单机型、单固件版本、特定命令组**的证据，不能外推为所有移动平台；【外部实现】RyzenAdj 已在多代移动 Ryzen APU 上实现 STAPM/PPT/TDC/EDC 等功耗限制调整，证明移动平台存在可用 SMU 功耗控制路径，但其支持矩阵不能替代对本机 9955HX 的验证；【文档】Intel 侧从未真机验证，属未验证而非不可用；APU 命令组当年只做了代码与单测，没有本项目真机写入记录，平台可用性来自产品侧确认而非本报告复现。
+- **实现口径**：Provider 声明参数是否支持及取值范围。HX 默认不展示常规功耗墙控制入口；用户明确选择主动尝试时，允许进入受控探测/写入流程，先识别平台与命令支持状态，写入前明确风险，写入后检查响应和回读，遇到拒绝或异常立即停止并报告。不得把主动尝试变成无条件批量写入。不新建覆盖所有平台的通用功耗框架，参数挂在已有 CPU Tuning Plan 下。
 - **验证前提**（逐平台，不要求全部满足）：
   1. 该平台有可复现的真机证据表明写入被接受且能持久生效（写入后回读一致、跨休眠保持）；
   2. 明确该平台的命令组与固件版本适用范围，不把单机结论推广到同类机型；
