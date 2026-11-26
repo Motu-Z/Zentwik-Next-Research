@@ -47,7 +47,7 @@ SmuReader（门面/状态机）→ SmuSession（命令语义）→ SmuChannel（
 | `GetBoostLimitFrequency` | 0x6E | 读当前 Boost/FMax 频率上限 | ZenStates `Zen4Settings.cs`；ryzen_smu `GetMaxFrequency` |
 | `SetBoostLimitFrequencyAllCores` | 0x70 | 写**全部核心**的 Boost 上限（Zentwik FMax 写入用此命令） | ZenStates `Zen4Settings.cs` |
 | `SetOverclockFrequencyAllCores` / `PerCore` | 0x5F / 0x60 | 另一组 OC 频率命令（MP1 侧为 0x26 / 0x27），**与 0x70 不同**，不得混用 | ZenStates `Zen4Settings.cs` Overclock Options 段 |
-| Zen2/3 `SetBoostLimit` | 0x00（不支持） | 该世代仅见读命令 0x6E，无对应全核写命令 | 本表历史口径（Inferred，逆向） |
+| Zen2/3 `SetBoostLimit` | 0x00（旧版未配置） | 该版家族映射未配置全核写命令；这不等于已证明该世代所有 SKU 的硬件都不支持 FMax 写入 | 本表历史口径（Inferred，逆向） |
 
 Zen4/5 补充命令号（**Verified 上游源码** `Zen4Settings.cs`，本轮逐行核对；作为硬件协议 Inferred）：全核 CO `SetAllDldoPsmMargin` = RSMU `0x07` / MP1 `0x36`；逐核 MP1 侧 `SetDldoPsmMargin=0x35`；Curve Shaper `Set=0xA6` / `Get=0x84`。RyzenAdj 对 FireRange/DragonRange 的逐核 `0x06` / 全核 `0x07` 独立交叉印证。按家族分派的完整对照见 [implementation-references.md](implementation-references.md) §4。
 
