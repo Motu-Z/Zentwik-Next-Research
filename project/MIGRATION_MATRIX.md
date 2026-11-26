@@ -37,7 +37,7 @@
 ## 由本表导出的剩余开发任务（按优先级）
 
 1. ~~**P1-B 补电源方案 CRUD**（#5）~~：已完成（2026-11-26，`power list/create/rename/delete` + `PowerSchemeService`）。剩余：核对策略项集合与逐项错误语义。
-2. **P0-E PawnIO/APOB 决策记录**：`decisions/` 下缺专门 ADR；需核实许可证/版本兼容/分发义务与 APOB 读取缺口。→ 文档/决策任务，不阻塞代码。
+2. ~~**P0-E PawnIO/APOB 决策记录**~~：已完成（2026-11-26，[ADR-008](../decisions/ADR-008-hardware-driver-and-apob.md)）。结论：唯一硬件驱动为 PawnIO + 官方签名模块，不引入第二驱动；APOB 不可读（PawnIO 模块无物理内存读，ZenStates-Core 走 inpoutx64 `MapPhysToLin`），核映射主路径改为 CPUID `0x8000001E` + L3 域。**遗留未完成项：分发合规**——仓库尚无 GPL-2.0/LGPL-2.1 文本与模块来源说明。
 3. **P0-D 硬件验证记录**：已分散在 `research/handoffs/M4-底层接手`，本表已汇总为"真机验证"列；如需独立证据文件再补。
 4. **P1-A 剩余：硬件功耗限制**（#3）：需产品确认范围（HX 默认隐藏、受控尝试）。
 5. **场景触发器核对**（#8）：确认 process 触发器是否覆盖"进程退出"。
