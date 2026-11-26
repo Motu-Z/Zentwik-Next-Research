@@ -52,7 +52,7 @@ SmuReader(门面/状态机)  →  SmuSession(命令语义)  →  SmuChannel(ioct
 
 - 就绪探针：先发 `0x01` 测试消息，参数 `[1,0,…]`，要求固件回 `2`（`SmuSession.cs:8,39-46`）。不通即 `ProbeFailed`，不进入任何写入。
 - CO 写入：逐核 `SetMargin` → 立即 `GetMargin` 回读 → 值不等即记为 `VerifyFailed`（`SmuReader.cs:376-422`）。输入侧再钳一次 `[-50,+50]`（`:318-319`）。
-- FMax 写入：**先读基线**再写，回读容差 ≤10 MHz（`:449-472`）。旧版实现曾把基线为 0 当作该消息不可用的判据；这是实现层判定逻辑，不是已验证的平台事实。没有具体机型、命令响应与读写记录时，不得据此声称某类移动平台不实现 FMax。
+- FMax 写入：**先读基线**再写，回读容差 ≤10 MHz（`:449-472`）。旧版 `SmuSession.GetFMax()` 在命令号为 0 **或** `TrySend` 失败时都会返回 0；`TuningStore.ResetToFactory()` 明确把基线 0 解释为“基线未知”，并跳过 FMax 写回。因此 0 不能证明平台不支持 FMax，也不能区分命令不支持与通信失败。旧版 `SmuMessages.For()` 对 Zen2/Zen3 将 `SetBoostLimit=0`，只说明该旧实现没有配置对应写命令；不能扩展成“部分移动平台硬件不实现 FMax”。
 - 并发：进程内 `static lock` 串行化"遥测读 / 写入"，避免半写状态被读走（`SmuReader.cs:27,241,347`）。**跨进程不成立**：UI 与 Worker 同时持句柄时无人仲裁。
 - 超时：由驱动内部完成（轮询响应寄存器，上限 8096 次，失败映射 `STATUS_DEVICE_BUSY` / `STATUS_IO_TIMEOUT`）。**【推断】** 旧版 `Execute` 只取 `Marshal.GetHRForLastWin32Error()`，拿到的是 Win32 错误码而非原始 NTSTATUS，因此 `SmuChannel.Send` 注释所称"区分拒绝与命令不存在"在实现上很可能**做不到**。
 - 断电/休眠：`SleepResumeWatcher` 明确假设 S3/休眠恢复后 CO、FMax 被清回出厂（`SleepResumeWatcher.cs:12-18`）。**【未验证】** 该假设在 S3 上并非普遍成立（S3 通常不断电），把它当事实会导致"多写一次"或"漏写一次"。
@@ -269,7 +269,7 @@ SmuReader(门面/状态机)  →  SmuSession(命令语义)  →  SmuChannel(ioct
 ## 10. 与旧项目的事实分歧（供决策记录引用）
 
 - 旧 README 称"调校只支持 AMD Ryzen"，但代码已有完整 Intel 通道并被 UI 接入（CHANGELOG 2.6.0-can1）；文档与实现不一致。
-- 旧代码称 SMU 命令号"与固件版本无关"，但 CO 命令按家族分叉；旧实现曾以 FMax 基线为 0 推断消息不可用，却没有对应的具体机型实测或命令响应证据，不能概括为"部分移动平台不实现 FMax"。**命令号与固件无直接绑定，但与平台/世代强绑定**。
+- 旧代码称 SMU 命令号"与固件版本无关"，但 CO 命令按家族分叉。旧版 `GetFMax()` 将“读命令号未配置”和“邮箱发送失败”都折叠为返回 0；`TuningStore` 将基线 0 解释为未知并跳过恢复写回。旧版 Zen2/Zen3 命令表的 `SetBoostLimit=0` 只代表该实现未配置对应写命令，不构成“部分移动平台硬件不实现 FMax”的证据。**命令号与固件无直接绑定，但与平台/世代强绑定**。
 - 旧代码称能通过 HRESULT 区分"SMU 拒绝"与"命令不存在"，实现只保留 Win32 错误码，能力被削弱。
 - 功耗限制"曾实现后移除"没有留下理由，不能据此推断"技术上不可行"。
 
