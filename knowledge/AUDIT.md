@@ -299,7 +299,16 @@
 
 ## 10.5 第八轮：FMax 移动平台支持范围与零值语义勘误（2026-11-26）
 
-- **撤回**“FMax 在部分移动平台不实现”这一概括。追溯发现它来自旧研究文档对 SmuReader.cs 基线零值分支的解释，没有给出具体移动 SKU、固件版本、原始命令响应或实测记录，证据不足。
-- **一手代码事实**：旧版 `SmuSession.GetFMax()` 在 `GetBoostLimit` 命令号为 0，或 `_channel.TrySend(...)` 返回 false 时，都会返回 0；该 API 把“命令未配置”和“发送失败”合并。旧版 `TuningStore.ResetToFactory()` 的注释明确规定，基线 0 表示“基线未知”，应跳过 FMax 写回，而不是表示平台不支持。旧版 `SmuMessages.For()` 对 Zen2/Zen3 的 `SetBoostLimit=0` 只说明该版本代码未配置对应写命令，不能外推为一类移动平台的硬件限制。
-- **外部反证**：FlyGoat/RyzenAdj 上游 README 将其定位为 Ryzen Mobile 电源管理调整工具，并实现 STAPM、PPT FAST/SLOW、TDC、EDC 等功耗/电流限制；其 Supported Models 列出多个移动 APU 家族。该事实否定“移动 Ryzen 平台普遍没有 SMU 功耗调整通道”，但不代替对特定 HX SKU 的验证。
+- **撤回**"FMax 在部分移动平台不实现"这一概括。追溯发现它来自旧研究文档对 SmuReader.cs 基线零值分支的解释，没有给出具体移动 SKU、固件版本、原始命令响应或实测记录，证据不足。
+- **一手代码事实**：旧版 `SmuSession.GetFMax()` 在 `GetBoostLimit` 命令号为 0，或 `_channel.TrySend(...)` 返回 false 时，都会返回 0；该 API 把"命令未配置"和"发送失败"合并。旧版 `TuningStore.ResetToFactory()` 的注释明确规定，基线 0 表示"基线未知"，应跳过 FMax 写回，而不是表示平台不支持。旧版 `SmuMessages.For()` 对 Zen2/Zen3 的 `SetBoostLimit=0` 只说明该版本代码未配置对应写命令，不能外推为一类移动平台的硬件限制。
+- **外部反证**：FlyGoat/RyzenAdj 上游 README 将其定位为 Ryzen Mobile 电源管理调整工具，并实现 STAPM、PPT FAST/SLOW、TDC、EDC 等功耗/电流限制；其 Supported Models 列出多个移动 APU 家族。该事实否定"移动 Ryzen 平台普遍没有 SMU 功耗调整通道"，但不代替对特定 HX SKU 的验证。
 - **处理**：已修订 `research/02-hardware-access.md`、`knowledge/hardware/cpu/amd-smu.md`、`research/LEGACY_POWER_CONTROL_INVESTIGATION.md` 与 `project/PRODUCT_MIGRATION_AND_ROADMAP.md`。今后区分命令未配置、SMU 明确拒绝/不支持、通信失败、有效读数为零；不得把零值或探测失败直接升格为平台能力结论。
+
+## 10.6 第九轮：全库交叉一致性审计与策略口径对齐（2026-11-26）
+
+本轮对照旧版 `Motu-Z/Zentwik`（`bc3c59b`）源码、`next` 分支最新提交、`FlyGoat/RyzenAdj` 上游资料及全库 60+ 份文档，对第八轮及之前遗留的跨文档不一致进行独立核验与清零：
+
+1. **修正 `knowledge/hardware/cpu/amd-smu.md` §3 表 1 遗漏**：第八轮提交 `b54b7453` 仅修正了 §3 命令变体表的 `Zen2/3 SetBoostLimit` 为 `0x00（旧版未配置）`，遗漏了同节首张总表中的 `0x00（不支持）`。已统一改为 `0x00（旧版未配置写命令）`，避免同一文档上下矛盾。
+2. **统一 `project/PRODUCT_MIGRATION_AND_ROADMAP.md` 中 HX 功耗墙与 APU/桌面端验证口径**：此前修订仅修改了 §3.1 补充段，而 §3.1 第 9 条、§4 扩展表、§5 P1 工作流与 §7 验收矩阵仍保留“HX 默认不提供”或直接写成“APU、桌面端可写”。已全部对齐为：APU/桌面端按具体平台能力提供（须经回读/真机验证，不以 RyzenAdj 支持矩阵代替本机实测）；HX 默认不展示常规控制入口，但允许用户主动选择受控尝试（先识别平台与命令、明确风险、写后回读验证，遇拒绝或异常即停止并报告）；明确区分 STAPM、PPT FAST/SLOW、TDC/EDC、Tctl 温度限制与 Windows Power Plan、只读功耗监控、EC/GCU 的边界。
+3. **同步 `research/LEGACY_POWER_CONTROL_INVESTIGATION.md` 内部口径**：同步修订 §9 结论摘要第 5 条以体现 HX 受控尝试策略与 EC/GCU 准入条件；收窄 §4.2 中 `0xFD` 表述的设备/固件/命令组范围并标注缺原始 `worker-*.log`；在 §2.2.2 补充旧版 UI 隐藏逻辑与新版 HX 策略的区分注记。
+4. **补充 `research/01-legacy-inventory.md` 与 `research/02-hardware-access.md` 证据限定与交叉引用**：将 `02-hardware-access.md` §0 的“验证最完整”收窄为“代码链路与校验逻辑最完整（仍缺原始实测日志）”；在 `01-legacy-inventory.md` 与 `02-hardware-access.md` 补全指向 `LEGACY_POWER_CONTROL_INVESTIGATION.md` 的引用，并注明 `01-legacy-inventory.md` §1 中的 `4450–5650MHz` 为特定机型 FMax 绝对频率范围，避免与 Boost Clock Override 混淆。
