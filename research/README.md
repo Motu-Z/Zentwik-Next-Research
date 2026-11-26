@@ -8,7 +8,6 @@
 - [02-hardware-access.md](02-hardware-access.md) — AMD SMU / Intel MSR / 电源 / 调度链路（含 §11 硬件实测补充）
 - [03-ui-ipc-deployment.md](03-ui-ipc-deployment.md) — UI 框架、进程模型、IPC、部署
 - [04-tech-stack-evaluation.md](04-tech-stack-evaluation.md) — 全栈技术评估（含实测数据）
-- [LEGACY_POWER_CONTROL_INVESTIGATION.md](LEGACY_POWER_CONTROL_INVESTIGATION.md) — 旧版 CPU 硬件功耗限制的实现、删除原因、SMU 写入证据与产品迁移边界
 - [RESEARCH_EFFICIENCY.md](RESEARCH_EFFICIENCY.md) — 研究效率与任务消耗控制
 
 ## 交接
@@ -18,6 +17,7 @@
 - `handoffs/M3-2026-11-25.md` — IPC 拒绝、服务恢复动作、场景退出回退、界面可访问性实测
 - `handoffs/接手核验-20261126.md` — 接手核验报告（代码与知识库冲突清单）
 - `handoffs/A1-2026-11-26.md` — M4-A1：CO 核掩码与物理核映射对齐（含本机拓扑实测）
+- `handoffs/Gemini-Hydrogen-接管交接-20261126.md` — Gemini Hydrogen 临时接管工程交接报告
 
 ## 约定
 
