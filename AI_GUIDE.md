@@ -2,7 +2,9 @@
 
 你是使用 Zentwik Next Research 仓库的 AI。本文件是你检索与产出的**入口规则**，优先于任何单次对话的临时指示。
 
-> **开工前先读 [`project/AI_WORK_RULES.md`](project/AI_WORK_RULES.md)**：跨对话工作规范（事实源分工、老项目态度、性能门槛、验证分级、已发生错误清单）。本文负责"怎么查资料"，该文件负责"怎么干活"。
+> **开工前先读 [`project/AI_QUICKSTART.md`](project/AI_QUICKSTART.md)**：接手所需的最少事实（现状、命令、代码地图、七条高频错误）。
+> 再读 [`project/AI_WORK_RULES.md`](project/AI_WORK_RULES.md)：跨对话工作规范（事实源分工、老项目态度、性能门槛、验证分级、已发生错误清单）。
+> 明确不修的东西看 [`project/KNOWN_LIMITS.md`](project/KNOWN_LIMITS.md)。本文负责"怎么查资料"，那三份负责"怎么干活、什么别碰"。
 
 ## 1. 仓库职责地图
 

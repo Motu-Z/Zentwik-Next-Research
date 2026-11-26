@@ -113,7 +113,7 @@ MSR、IA32_OC_MAILBOX (0x150)、电压平面（IA Core / GT / Cache）、Undervo
 |---|---|---|
 | "Intel 偏移和 AMD CO 是同一种降压值" | 完全不同：这里是电压量（1/1024 V），AMD 是无量纲档位 | Verified |
 | "0x150 是普通可读寄存器" | 是邮箱，读也需先写命令字；且有 busy 位与互斥要求 | Verified |
-| "写入成功且回读一致 = 电压真的降了" | 否。请求型接口，锁定/UVP 下回读仍可能是写入值；需负载下观测频率/功耗/温度 | Inferred，`research/02` §3.2/§8.3 |
+| "写入成功且回读一致 = 电压真的降了" | 否。请求型接口，锁定/UVP 下回读仍可能是写入值。产品只对"请求被接受 + 回读一致"负责，效果层（频率/功耗/温度）**不是产品验收条件** | Inferred，`research/02` §3.2/§8.3 + 产品边界（2026-11-26） |
 | "公开 SDM 有完整命令表" | 没有。内核维护者明确指出非架构接口、无公开文档 | Verified（LKML） |
 | "任意 MSR 都能写" | PawnIO `IntelMSR.bin` 是白名单；`0x1FC`/`0x199` 不可写 | Verified，`research/02` §3.1 |
 | "所有 Intel CPU 都能降压" | 非 K 锁定、UVP+VBS、Plundervolt 微码锁均可使其不可用 | Verified（Intel 官方） |
