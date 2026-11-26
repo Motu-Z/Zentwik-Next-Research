@@ -71,7 +71,7 @@ Zen4/5 补充命令号（**Verified 上游源码** `Zen4Settings.cs`，本轮逐
 
 - 就绪探针：发 `0x01`，参数 `[1,0,…]`，要求回 `2`；不通即 `ProbeFailed`，不进入写入。
 - CO 写入：逐核 SetMargin → GetMargin 回读 → 不等即 `VerifyFailed`。
-- FMax 写入：先读基线再写，回读容差 ≤10 MHz；基线为 0 视为该平台不实现该消息。
+- FMax 写入：先读基线再写，回读容差 ≤10 MHz。旧版实现曾将基线为 0 视为消息不可用，但这只是实现层判据，缺少具体平台与命令响应证据，不能据此断言该平台不支持 FMax；需结合家族分派、SMU 响应和实际读写验证。
 - **FMax 与 OC 定频是不同命令族，不可合并判断**：定频用 `0x5A/0x5C/0x5D`，FMax 上限用 `0x6E`/`0x70`。9955HX 上定频被固件关闭（`0x6F`→`0xE6`、`0x2C` 不存在），但 FMax 未被拒绝（2026-11-26 产品负责人确认；单机结论，写入证据待管理员会话复核）。不得把"定频不可行"写成"FMax 不可用"。
 - **FMax / Boost Clock Override（本参数的分层权威定义）**：本节是仓库内单一权威定义点，其余文档只引用不重抄；分层规则见 [parameter-record-schema.md](../../data/parameter-record-schema.md)。
 
