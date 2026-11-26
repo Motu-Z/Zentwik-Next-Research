@@ -241,7 +241,9 @@ TuningViewModel.PowerLimits.cs → RefreshPowerLimitsAsync / ApplyPowerLimitsAsy
 
 ### 3.4 限制范围：设备特有还是一类平台
 
-**【外部实现反证】RyzenAdj 并非只处理桌面端。**其上游 README 明确将项目定位为 Ryzen Mobile 电源管理调整工具，并提供 STAPM、PPT FAST/SLOW、TDC、EDC 等功耗/电流限制设置；Supported Models 表也列出 Raven、Picasso、Renoir、Lucienne、Cezanne、Rembrandt 等移动 APU 家族的参数支持情况。该资料足以否定"移动 Ryzen 平台普遍没有 SMU 功耗调整通道"这种概括，但不能单独证明每一款 HX、尤其本机 9955HX 的具体命令都可写。具体平台仍须按型号、固件与参数逐项验证。
+**【外部实现反证】RyzenAdj 并非只处理桌面端。**[上游 README](https://github.com/FlyGoat/RyzenAdj/blob/master/README.md) 明确将项目定位为 Ryzen Mobile 电源管理调整工具，并提供 STAPM、PPT FAST/SLOW、TDC、EDC 等功耗/电流限制设置；[Supported Models](https://github.com/FlyGoat/RyzenAdj/wiki/Supported-Models) 列出 Raven、Picasso、Renoir、Lucienne、Cezanne、Rembrandt 等移动 APU 家族的参数支持情况。该资料足以否定“移动 Ryzen 平台普遍没有 SMU 功耗调整通道”这种概括，但不能单独证明每一款 HX、尤其本机 9955HX 的具体命令都可写。具体平台仍须按型号、固件与参数逐项验证。
+
+**【代码】FMax 零值语义勘误**：旧版 [SmuSession.GetFMax()](https://github.com/Motu-Z/Zentwik/blob/bc3c59bb8aa99b4abeac453befe1b8a7b182a26d/Zentwik.Core/Smu/SmuSession.cs) 在 Get 命令号为 0 或 `TrySend` 失败时都返回 0；[TuningStore.ResetToFactory()](https://github.com/Motu-Z/Zentwik/blob/bc3c59bb8aa99b4abeac453befe1b8a7b182a26d/Zentwik.Core/Helpers/TuningStore.cs) 明确将基线 0 解释为“基线未知”，跳过 FMax 写回。旧版 `SmuMessages.For()` 对 Zen2/Zen3 将 `SetBoostLimit=0`，只能证明旧实现没有配置对应写命令，不能据此推导某类移动平台的硬件不实现 FMax。
 
 **【测试】已验证**：仅限本机 Fire Range（9955HX）在当时的 BIOS / 固件版本下。
 
