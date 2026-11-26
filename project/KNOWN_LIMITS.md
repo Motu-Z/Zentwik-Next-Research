@@ -22,7 +22,7 @@
 
 ## 3. CPU Sets 与核心停泊
 
-- **现状**：已实现 `PlanCoordinator.WarnCoreParking`——CPU Sets 写入成功后读一次 `CPMINCORES`（`0cc5b647-c1df-4637-891a-dec35c318583`，子组 `54533251-82be-4824-96c1-47b60b740d00`），低于 100 时按方案记一次 WARN，说明实际运行范围可能超出设定集合。
+- **现状**：已实现 `PlanCoordinator.WarnCoreParking`——CPU Sets 写入成功后按**当前供电侧**读一次 `CPMINCORES`（`0cc5b647-c1df-4637-891a-dec35c318583`，子组 `54533251-82be-4824-96c1-47b60b740d00`），低于 100 时按方案记一次 WARN，说明实际运行范围可能超出设定集合。本机实测 AC=100 / DC=10，插电时不会触发。
 - **不做**：不自动修改用户的电源方案把停泊关掉。那是用户配置，改了就是越权。
 - **依据**：老项目 `ProcessWatcher.ParkingSuffix`（只提示不改）+ `PowerPolicyService` 注释。
 - **修好前如何表达**：日志 WARN，不进账本状态（CPU Sets 仍是 Applied，写入本身成功了）。
