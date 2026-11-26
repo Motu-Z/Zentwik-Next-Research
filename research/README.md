@@ -8,6 +8,7 @@
 - [02-hardware-access.md](02-hardware-access.md) — AMD SMU / Intel MSR / 电源 / 调度链路（含 §11 硬件实测补充）
 - [03-ui-ipc-deployment.md](03-ui-ipc-deployment.md) — UI 框架、进程模型、IPC、部署
 - [04-tech-stack-evaluation.md](04-tech-stack-evaluation.md) — 全栈技术评估（含实测数据）
+- [LEGACY_POWER_CONTROL_INVESTIGATION.md](LEGACY_POWER_CONTROL_INVESTIGATION.md) — 旧版 CPU 硬件功耗限制的实现、删除原因、SMU 写入证据与产品迁移边界
 - [RESEARCH_EFFICIENCY.md](RESEARCH_EFFICIENCY.md) — 研究效率与任务消耗控制
 
 ## 交接
