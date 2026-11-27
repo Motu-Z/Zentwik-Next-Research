@@ -1,0 +1,938 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark" data-density="standard">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Zentwik Next · 首页重构原型 v3 · Modular Workspace</title>
+<style>
+:root {
+  color-scheme: dark;
+  --accent: #6795ff;
+  --accent-rgb: 103 149 255;
+  --bg-app: #0b0e13;
+  --bg-title: #090c11;
+  --bg-sidebar: #0d1118;
+  --bg-main: #10151d;
+  --bg-raised: #151c27;
+  --bg-raised-2: #1a2330;
+  --bg-hover: #202b3a;
+  --line: #222c39;
+  --line-soft: #1b2430;
+  --text: #e9eef6;
+  --text-2: #9ba8ba;
+  --text-3: #68788d;
+  --green: #42c58a;
+  --amber: #e8ad55;
+  --red: #e36d75;
+  --blue: #77a9ec;
+  --sans: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  --mono: "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+  --radius: 10px;
+  --pad-main: 26px;
+  --gap: 16px;
+  --row-gap: 12px;
+  --surface-pad: 18px;
+}
+html[data-theme="light"] {
+  color-scheme: light;
+  --bg-app: #e8ecf2;
+  --bg-title: #f6f8fb;
+  --bg-sidebar: #f0f3f7;
+  --bg-main: #f8fafc;
+  --bg-raised: #ffffff;
+  --bg-raised-2: #f1f4f8;
+  --bg-hover: #e8edf4;
+  --line: #dce3ec;
+  --line-soft: #e8edf3;
+  --text: #18212d;
+  --text-2: #526174;
+  --text-3: #8290a2;
+  --green: #168b5d;
+  --amber: #a96b10;
+  --red: #c34e57;
+  --blue: #386fae;
+}
+html[data-density="compact"] { --pad-main: 19px; --gap: 11px; --row-gap: 8px; --surface-pad: 13px; --radius: 8px; }
+html[data-density="relaxed"] { --pad-main: 32px; --gap: 21px; --row-gap: 16px; --surface-pad: 22px; --radius: 12px; }
+* { box-sizing: border-box; }
+html, body { min-width: 320px; min-height: 100%; margin: 0; }
+body { background: #080b10; color: var(--text); font: 13px/1.45 var(--sans); font-variant-numeric: tabular-nums; }
+button { color: inherit; font: inherit; }
+button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.prototype-bar { height: 38px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #111722; color: #d8e1ed; border-bottom: 1px solid #293345; font-size: 11px; }
+.proto-left, .proto-tools { display: flex; align-items: center; gap: 10px; }
+.proto-name { font-weight: 650; letter-spacing: .02em; }
+.proto-tag { padding: 3px 7px; border-radius: 5px; color: #b7c8e0; background: #243247; }
+.proto-demo { color: #e8bb76; }
+.proto-tools button, .proto-tools input { height: 25px; border: 1px solid #364257; border-radius: 5px; background: #1a2432; color: #d7e1ef; padding: 0 8px; cursor: pointer; }
+.proto-tools input { width: 28px; padding: 2px; }
+.proto-tools button[aria-pressed="true"] { background: #344761; color: white; }
+.app-frame { height: calc(100vh - 38px); min-height: 620px; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-app); }
+.titlebar { height: 43px; flex: 0 0 43px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px 0 18px; background: var(--bg-title); border-bottom: 1px solid var(--line-soft); }
+.system-context { min-width: 0; display: flex; align-items: center; gap: 10px; color: var(--text-2); white-space: nowrap; }
+.connected-dot { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 13%, transparent); }
+.context-brand { color: var(--text); font-weight: 700; letter-spacing: .02em; }
+.context-divider { height: 15px; width: 1px; background: var(--line); }
+.context-hardware { overflow: hidden; text-overflow: ellipsis; }
+.context-state { color: var(--text-3); }
+.title-actions { display: flex; align-items: center; height: 100%; gap: 3px; }
+.icon-button, .window-button { width: 34px; height: 32px; display: inline-grid; place-items: center; position: relative; padding: 0; border: 0; border-radius: 7px; background: transparent; color: var(--text-2); cursor: pointer; }
+.icon-button:hover, .window-button:hover { background: var(--bg-hover); color: var(--text); }
+.icon-button[aria-expanded="true"] { color: var(--accent); background: rgb(var(--accent-rgb) / .12); }
+.icon-button svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.action-count { position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
+.window-button { width: 31px; border-radius: 0; }
+.window-button svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 1.3; }
+.window-button.close:hover { background: #c43d48; color: white; }
+.workspace { flex: 1; min-height: 0; display: flex; padding: 10px; gap: 10px; }
+.sidebar { width: 218px; flex: 0 0 218px; display: flex; flex-direction: column; justify-content: space-between; padding: 12px 9px 10px; border: 1px solid var(--line-soft); border-radius: 11px; background: var(--bg-sidebar); transition: width .18s ease, flex-basis .18s ease; overflow: hidden; }
+.sidebar.collapsed { width: 58px; flex-basis: 58px; }
+.brand-button { width: 100%; height: 40px; display: flex; align-items: center; gap: 11px; padding: 0 9px; margin: 0 0 15px; border: 0; border-radius: 8px; background: transparent; cursor: pointer; text-align: left; }
+.brand-button:hover { background: var(--bg-hover); }
+.brand-mark { width: 25px; height: 25px; flex: 0 0 25px; }
+.brand-label { font-size: 14px; font-weight: 720; letter-spacing: .025em; }
+.nav-list { display: flex; flex-direction: column; gap: 3px; }
+.nav-label-group { margin: 12px 9px 6px; color: var(--text-3); font-size: 10px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+.nav-item { width: 100%; height: 37px; display: flex; align-items: center; gap: 11px; padding: 0 10px; border: 0; border-radius: 7px; background: transparent; color: var(--text-2); text-align: left; white-space: nowrap; cursor: pointer; }
+.nav-item:hover { background: var(--bg-hover); color: var(--text); }
+.nav-item.active { background: rgb(var(--accent-rgb) / .12); color: var(--text); }
+.nav-item.active::before { content: ""; width: 2px; height: 18px; position: absolute; margin-left: -10px; border-radius: 0 3px 3px 0; background: var(--accent); }
+.nav-icon { width: 17px; height: 17px; flex: 0 0 17px; display: grid; place-items: center; }
+.nav-icon svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.65; stroke-linecap: round; stroke-linejoin: round; }
+.nav-bottom { border-top: 1px solid var(--line-soft); padding-top: 9px; }
+.sidebar.collapsed .brand-label, .sidebar.collapsed .nav-label, .sidebar.collapsed .nav-label-group { display: none; }
+.sidebar.collapsed .brand-button, .sidebar.collapsed .nav-item { justify-content: center; padding: 0; }
+.sidebar.collapsed .nav-item.active::before { margin-left: -38px; }
+.main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; border: 1px solid var(--line-soft); border-radius: 11px; background: var(--bg-main); overflow: hidden; }
+.page-head { height: 58px; flex: 0 0 58px; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--pad-main); border-bottom: 1px solid var(--line-soft); }
+.page-title { display: flex; align-items: center; gap: 10px; font-size: 17px; line-height: 1; font-weight: 680; letter-spacing: -.025em; }
+.page-state { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 5px; color: var(--text-2); font-size: 10px; font-weight: 550; }
+.page-state .connected-dot { width: 5px; height: 5px; flex-basis: 5px; box-shadow: none; }
+.head-right { display: flex; align-items: center; gap: 7px; }
+.ghost-button { height: 30px; display: inline-flex; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--text-2); cursor: pointer; }
+.ghost-button:hover { border-color: var(--text-3); color: var(--text); background: var(--bg-raised); }
+.ghost-button svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; }
+.content-scroll { flex: 1; min-height: 0; overflow: auto; padding: var(--pad-main); scrollbar-color: var(--line) transparent; scrollbar-width: thin; }
+.section-label { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 11px; color: var(--text-2); font-size: 11px; font-weight: 650; letter-spacing: .045em; }
+.section-label .right-note { color: var(--text-3); font-size: 10px; font-weight: 450; letter-spacing: 0; }
+.pulse-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 22px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-raised); overflow: hidden; }
+.pulse-cell { min-height: 88px; display: flex; flex-direction: column; justify-content: center; padding: 13px 18px; position: relative; }
+.pulse-cell + .pulse-cell { border-left: 1px solid var(--line-soft); }
+.pulse-label { color: var(--text-2); font-size: 11px; margin-bottom: 5px; }
+.pulse-value-row { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
+.pulse-value { color: var(--text); font: 650 22px/1.2 var(--mono); letter-spacing: -.045em; white-space: nowrap; }
+.pulse-value.scene-value { font: 650 16px/1.5 var(--sans); letter-spacing: -.015em; }
+.pulse-unit { color: var(--text-3); font: 11px var(--mono); }
+.pulse-foot { color: var(--text-3); font-size: 10px; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.content-grid { display: grid; grid-template-columns: minmax(0, 1.62fr) minmax(280px, .9fr); gap: var(--gap); align-items: start; }
+.primary-column, .side-column { min-width: 0; display: flex; flex-direction: column; gap: 21px; }
+.section { min-width: 0; }
+.domain-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.domain-card { min-width: 0; min-height: 132px; display: flex; flex-direction: column; padding: var(--surface-pad); position: relative; overflow: hidden; border: 1px solid var(--line-soft); border-radius: var(--radius); background: var(--bg-raised); transition: border-color .15s, background .15s, transform .15s; }
+.domain-card:hover { border-color: color-mix(in srgb, var(--accent) 42%, var(--line)); background: var(--bg-raised-2); transform: translateY(-1px); }
+.domain-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
+.domain-title { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12px; font-weight: 630; }
+.domain-title svg { width: 16px; height: 16px; flex: 0 0 16px; fill: none; stroke: var(--text-2); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.state { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); font-size: 10px; white-space: nowrap; }
+.state-dot { width: 6px; height: 6px; flex: 0 0 6px; border-radius: 50%; background: var(--green); }
+.state-dot.warn { background: var(--amber); }
+.domain-primary { margin: 0 0 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; line-height: 1.4; font-weight: 650; letter-spacing: -.015em; }
+.domain-secondary { color: var(--text-2); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.domain-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 12px; color: var(--text-3); font-size: 10px; }
+.attention-list { border-top: 1px solid var(--line); }
+.attention-row { min-height: 53px; display: grid; grid-template-columns: 7px minmax(0,1fr) auto; align-items: center; gap: 10px; border-bottom: 1px solid var(--line-soft); }
+.attention-indicator { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
+.attention-indicator.good { background: var(--green); }
+.attention-main { min-width: 0; }
+.attention-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-size: 11px; font-weight: 560; }
+.attention-sub { margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-3); font-size: 10px; }
+.attention-status { color: var(--amber); font-size: 10px; white-space: nowrap; }
+.attention-status.good { color: var(--green); }
+.scene-panel { padding: var(--surface-pad); border: 1px solid var(--line-soft); border-radius: var(--radius); background: var(--bg-raised); }
+.scene-current { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 13px; border-bottom: 1px solid var(--line-soft); }
+.scene-name { display: flex; align-items: center; gap: 9px; font-size: 15px; font-weight: 680; }
+.scene-symbol { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: var(--accent); background: rgb(var(--accent-rgb) / .12); }
+.scene-symbol svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.active-pill { padding: 4px 7px; color: var(--green); background: color-mix(in srgb, var(--green) 10%, transparent); border-radius: 5px; font-size: 10px; white-space: nowrap; }
+.scene-domains { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; padding-top: 12px; }
+.scene-domain { min-width: 0; }
+.scene-domain-label { color: var(--text-3); font-size: 10px; }
+.scene-domain-value { margin-top: 3px; color: var(--text); font-size: 11px; font-weight: 570; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scene-next { display: flex; flex-direction: column; gap: 0; padding-top: 12px; }
+.scene-next-row { display: flex; justify-content: space-between; gap: 8px; padding: 7px 0; color: var(--text-2); font-size: 10px; }
+.scene-next-row + .scene-next-row { border-top: 1px solid var(--line-soft); }
+.scene-next-row span:last-child { color: var(--text-3); }
+.activity { border-top: 1px solid var(--line); }
+.activity-row { display: grid; grid-template-columns: 42px 7px minmax(0,1fr) auto; align-items: center; gap: 10px; min-height: 41px; border-bottom: 1px solid var(--line-soft); }
+.activity-time { color: var(--text-3); font: 10px var(--mono); }
+.activity-marker { width: 5px; height: 5px; border-radius: 50%; background: var(--blue); }
+.activity-marker.warn { background: var(--amber); }
+.activity-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); font-size: 11px; }
+.activity-tag { padding: 3px 6px; border-radius: 4px; color: var(--text-3); background: var(--bg-raised-2); font-size: 9px; }
+.popover { width: 310px; position: fixed; z-index: 20; top: 49px; right: 116px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-raised); box-shadow: 0 14px 40px rgb(0 0 0 / .28); }
+.popover[hidden] { display: none; }
+.popover-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; color: var(--text); font-size: 12px; font-weight: 650; }
+.popover-close { width: 23px; height: 23px; border: 0; border-radius: 5px; background: transparent; color: var(--text-3); cursor: pointer; }
+.popover-close:hover { background: var(--bg-hover); color: var(--text); }
+.popover-item { display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line-soft); color: var(--text-2); font-size: 11px; }
+.popover-item strong { color: var(--text); font-weight: 560; }
+.popover-status { color: var(--amber); white-space: nowrap; }
+.popover-status.good { color: var(--green); }
+.footer-line { display: flex; justify-content: space-between; gap: 12px; margin-top: 15px; color: var(--text-3); font-size: 9px; }
+@media (max-width: 1100px) {
+  .sidebar { width: 58px; flex-basis: 58px; }
+  .sidebar .brand-label, .sidebar .nav-label, .sidebar .nav-label-group { display: none; }
+  .sidebar .brand-button, .sidebar .nav-item { justify-content: center; padding: 0; }
+  .sidebar .nav-item.active::before { margin-left: -38px; }
+  .content-grid { grid-template-columns: minmax(0, 1.35fr) minmax(260px, .85fr); }
+  .pulse-cell { padding-left: 13px; padding-right: 13px; }
+}
+@media (max-width: 820px) {
+  .app-frame { height: auto; min-height: calc(100vh - 38px); overflow: visible; }
+  .workspace { min-height: calc(100vh - 81px); }
+  .sidebar { display: none; }
+  .main { min-height: calc(100vh - 101px); }
+  .content-grid { grid-template-columns: 1fr; }
+  .side-column { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-items: start; }
+  .pulse-row { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .pulse-cell:nth-child(3) { border-left: 0; border-top: 1px solid var(--line-soft); }
+  .pulse-cell:nth-child(4) { border-top: 1px solid var(--line-soft); }
+}
+@media (max-width: 560px) {
+  .prototype-bar { padding: 0 9px; }
+  .proto-left { gap: 6px; }
+  .proto-tools { gap: 4px; }
+  .proto-tools button { padding: 0 5px; }
+  .context-hardware, .context-state, .context-divider { display: none; }
+  .workspace { padding: 5px; }
+  .page-head { padding: 0 15px; }
+  .content-scroll { padding: 15px; }
+  .pulse-row { margin-bottom: 17px; }
+  .pulse-cell { min-height: 78px; padding: 10px 12px; }
+  .pulse-value { font-size: 19px; }
+  .domain-grid, .side-column { grid-template-columns: 1fr; }
+  .domain-card { min-height: 120px; }
+  .popover { width: min(310px, calc(100vw - 20px)); right: 10px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: .01ms !important; scroll-behavior: auto !important; } }
+
+/* v2: Translucent Workspace visual system */
+:root {
+  --bg-app: #17191f;
+  --bg-title: rgb(27 29 37 / .58);
+  --bg-sidebar: rgb(255 255 255 / .055);
+  --bg-main: rgb(255 255 255 / .035);
+  --bg-raised: rgb(255 255 255 / .065);
+  --bg-raised-2: rgb(255 255 255 / .105);
+  --bg-hover: rgb(255 255 255 / .09);
+  --line: rgb(255 255 255 / .12);
+  --line-soft: rgb(255 255 255 / .075);
+  --text: #f0eff4;
+  --text-2: #b5b3bf;
+  --text-3: #858391;
+  --radius: 17px;
+  --pad-main: 30px;
+  --gap: 20px;
+  --row-gap: 14px;
+  --surface-pad: 19px;
+}
+html[data-theme="light"] {
+  --bg-app: #e9e5e6;
+  --bg-title: rgb(255 255 255 / .58);
+  --bg-sidebar: rgb(255 255 255 / .48);
+  --bg-main: rgb(255 255 255 / .34);
+  --bg-raised: rgb(255 255 255 / .58);
+  --bg-raised-2: rgb(255 255 255 / .78);
+  --bg-hover: rgb(255 255 255 / .62);
+  --line: rgb(70 57 68 / .12);
+  --line-soft: rgb(70 57 68 / .075);
+  --text: #28232b;
+  --text-2: #655d68;
+  --text-3: #8c8490;
+}
+html[data-density="compact"] { --pad-main: 22px; --gap: 14px; --surface-pad: 15px; --radius: 14px; }
+html[data-density="relaxed"] { --pad-main: 36px; --gap: 24px; --surface-pad: 23px; --radius: 19px; }
+body { background: #17171d; }
+.prototype-bar { background: rgb(22 23 30 / .92); border-color: rgb(255 255 255 / .08); backdrop-filter: blur(22px) saturate(145%); }
+html[data-theme="light"] .prototype-bar { background: rgb(249 246 248 / .94); color: #39323b; border-color: rgb(50 40 50 / .1); }
+html[data-theme="light"] .proto-tag { background: rgb(var(--accent-rgb) / .12); color: #51445a; }
+html[data-theme="light"] .proto-tools button, html[data-theme="light"] .proto-tools input { background: rgb(255 255 255 / .68); color: #443c47; border-color: rgb(60 50 60 / .14); }
+.app-frame { position: relative; isolation: isolate; background: var(--bg-app); }
+.app-frame::before, .app-frame::after { content:""; position:absolute; z-index:-1; pointer-events:none; border-radius:50%; filter:blur(75px); opacity:.32; }
+.app-frame::before { width:520px; height:420px; top:-170px; left:18%; background: color-mix(in srgb, var(--accent) 48%, #b47d94); }
+.app-frame::after { width:460px; height:430px; right:-170px; bottom:-190px; background:#6e819d; opacity:.18; }
+html[data-theme="light"] .app-frame::before { opacity:.25; background: color-mix(in srgb, var(--accent) 35%, #d9a8b9); }
+html[data-theme="light"] .app-frame::after { opacity:.20; background:#b8a9c1; }
+.titlebar { background: var(--bg-title); border-bottom:1px solid var(--line-soft); backdrop-filter:blur(26px) saturate(155%); }
+.system-context { gap:11px; }
+.connected-dot { box-shadow:0 0 0 4px color-mix(in srgb,var(--green) 14%,transparent), 0 0 13px color-mix(in srgb,var(--green) 35%,transparent); }
+.workspace { padding:13px; gap:13px; }
+.sidebar { width:206px; flex-basis:206px; padding:15px 10px 12px; border:1px solid var(--line-soft); border-radius:19px; background:var(--bg-sidebar); backdrop-filter:blur(28px) saturate(150%); box-shadow:0 12px 38px rgb(0 0 0 / .08), inset 0 1px 0 rgb(255 255 255 / .07); }
+.sidebar.collapsed { width:60px; flex-basis:60px; }
+.brand-button { height:43px; margin-bottom:18px; }
+.brand-mark { filter:drop-shadow(0 0 8px color-mix(in srgb,var(--accent) 34%,transparent)); }
+.nav-list { gap:5px; }
+.nav-label-group { margin:14px 11px 8px; letter-spacing:.11em; }
+.nav-item { height:39px; border-radius:10px; gap:12px; padding:0 11px; transition:background .16s,color .16s; }
+.nav-item.active { background:color-mix(in srgb,var(--accent) 15%,transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 13%,transparent); }
+.nav-item.active::before { height:19px; width:3px; margin-left:-11px; border-radius:0 4px 4px 0; box-shadow:0 0 10px color-mix(in srgb,var(--accent) 55%,transparent); }
+.nav-bottom { border-color:var(--line-soft); }
+.main { border:1px solid var(--line-soft); border-radius:21px; background:var(--bg-main); backdrop-filter:blur(34px) saturate(145%); box-shadow:0 18px 60px rgb(0 0 0 / .10), inset 0 1px 0 rgb(255 255 255 / .055); }
+.page-head { height:68px; flex-basis:68px; border-bottom:1px solid var(--line-soft); }
+.page-title { font-size:19px; letter-spacing:-.035em; }
+.page-state { padding:5px 10px; border:0; border-radius:20px; background:color-mix(in srgb,var(--green) 10%,transparent); }
+.content-scroll { scrollbar-color:color-mix(in srgb,var(--text-3) 30%,transparent) transparent; }
+.section-label { margin-bottom:13px; color:var(--text-2); font-size:11px; letter-spacing:.065em; }
+.pulse-row { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); margin-bottom:27px; border:1px solid var(--line-soft); border-radius:18px; background:color-mix(in srgb,var(--bg-raised) 78%,transparent); backdrop-filter:blur(22px); box-shadow:0 10px 28px rgb(0 0 0 / .045),inset 0 1px 0 rgb(255 255 255 / .08); }
+.pulse-cell { min-height:104px; padding:17px 21px; }
+.pulse-cell + .pulse-cell { border-left:1px solid var(--line-soft); }
+.pulse-label { margin-bottom:7px; font-size:11px; }
+.pulse-value { font-size:25px; font-weight:620; letter-spacing:-.055em; }
+.pulse-value.scene-value { font-size:17px; }
+.content-grid { grid-template-columns:minmax(0,1.55fr) minmax(300px,.86fr); gap:26px; }
+.primary-column,.side-column { gap:25px; }
+.domain-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:11px; }
+.domain-card { min-height:143px; padding:18px 19px; border:1px solid var(--line-soft); border-radius:17px; background:var(--bg-raised); backdrop-filter:blur(18px) saturate(135%); box-shadow:0 7px 24px rgb(0 0 0 / .035),inset 0 1px 0 rgb(255 255 255 / .06); transition:transform .18s,border-color .18s,background .18s,box-shadow .18s; }
+.domain-card:hover { transform:translateY(-2px); border-color:color-mix(in srgb,var(--accent) 34%,var(--line)); background:var(--bg-raised-2); box-shadow:0 12px 30px rgb(0 0 0 / .08),inset 0 1px 0 rgb(255 255 255 / .1); }
+.domain-top { margin-bottom:17px; }
+.domain-title { font-size:12px; }
+.domain-primary { font-size:16px; }
+.domain-secondary { font-size:11px; }
+.domain-bottom { padding-top:14px; }
+.attention-list { border-top:1px solid var(--line-soft); }
+.attention-row { min-height:59px; grid-template-columns:8px minmax(0,1fr) auto; gap:12px; border-bottom:1px solid var(--line-soft); }
+.attention-indicator { box-shadow:0 0 0 4px color-mix(in srgb,var(--amber) 10%,transparent); }
+.attention-indicator.good { box-shadow:0 0 0 4px color-mix(in srgb,var(--green) 9%,transparent); }
+.attention-title { font-size:12px; }
+.attention-sub { font-size:10px; }
+.attention-status { padding:4px 8px; border-radius:20px; background:color-mix(in srgb,var(--amber) 10%,transparent); }
+.attention-status.good { background:color-mix(in srgb,var(--green) 9%,transparent); }
+.scene-panel { padding:19px; border:1px solid var(--line-soft); border-radius:18px; background:var(--bg-raised); backdrop-filter:blur(22px) saturate(135%); box-shadow:0 8px 26px rgb(0 0 0 / .04),inset 0 1px 0 rgb(255 255 255 / .06); }
+.scene-current { padding-bottom:16px; border-color:var(--line-soft); }
+.scene-name { font-size:16px; }
+.scene-symbol { width:34px; height:34px; border-radius:11px; box-shadow:inset 0 1px 0 rgb(255 255 255 / .1); }
+.active-pill { padding:5px 9px; border-radius:20px; }
+.scene-domains { gap:14px; padding-top:15px; }
+.scene-next { padding-top:15px; }
+.scene-next-row { padding:9px 0; }
+.activity { border-top:1px solid var(--line-soft); }
+.activity-row { min-height:47px; grid-template-columns:48px 7px minmax(0,1fr) auto; border-color:var(--line-soft); }
+.activity-tag { padding:4px 7px; border-radius:6px; background:var(--bg-raised); }
+.popover { border:1px solid var(--line); border-radius:16px; background:color-mix(in srgb,var(--bg-raised-2) 88%,transparent); backdrop-filter:blur(30px) saturate(160%); box-shadow:0 20px 60px rgb(0 0 0 / .22),inset 0 1px 0 rgb(255 255 255 / .1); }
+.popover-item { border-color:var(--line-soft); }
+.footer-line { margin-top:18px; }
+html[data-theme="light"] .main,html[data-theme="light"] .sidebar,html[data-theme="light"] .pulse-row,html[data-theme="light"] .domain-card,html[data-theme="light"] .scene-panel { box-shadow:0 12px 34px rgb(75 55 70 / .055),inset 0 1px 0 rgb(255 255 255 / .62); }
+@media (max-width:1100px) { .content-grid { grid-template-columns:minmax(0,1.25fr) minmax(270px,.9fr); } .pulse-cell { padding-left:15px;padding-right:15px; } }
+@media (max-width:820px) { .content-grid { grid-template-columns:1fr; } .side-column { display:grid;grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:560px) { .workspace { padding:6px; } .page-head { height:60px;flex-basis:60px; } .content-scroll { padding:16px; } .pulse-cell { min-height:82px;padding:11px 13px; } .pulse-value { font-size:20px; } .domain-grid,.side-column { grid-template-columns:1fr; } }
+
+
+/* v3: Unified runtime stream and extensible home dashboard */
+.page-head { gap: 16px; }
+.page-tools { display:flex; align-items:center; gap:9px; }
+.layout-hint { color:var(--text-3); font-size:10px; margin-right:4px; }
+.primary-button { height:32px; display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:0 12px; border:1px solid color-mix(in srgb,var(--accent) 54%,transparent); border-radius:8px; background:color-mix(in srgb,var(--accent) 19%,var(--bg-raised)); color:var(--text); font:600 11px var(--sans); cursor:pointer; transition:background .15s,border-color .15s,transform .15s; }
+.primary-button:hover { background:color-mix(in srgb,var(--accent) 28%,var(--bg-raised)); border-color:var(--accent); transform:translateY(-1px); }
+.widget-grid { display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); gap:var(--gap); align-items:start; }
+.widget { min-width:0; min-height:0; grid-column:span 6; scroll-margin-top:15px; }
+.widget[hidden] { display:none !important; }
+.widget.span-4 { grid-column:span 4; }
+.widget.span-5 { grid-column:span 5; }
+.widget.span-6 { grid-column:span 6; }
+.widget.span-7 { grid-column:span 7; }
+.widget.span-8 { grid-column:span 8; }
+.widget.span-12 { grid-column:span 12; }
+.widget-surface { min-width:0; height:100%; padding:18px 19px; border:1px solid var(--line-soft); border-radius:18px; background:color-mix(in srgb,var(--bg-raised) 83%,transparent); backdrop-filter:blur(23px) saturate(142%); box-shadow:0 9px 28px rgb(0 0 0 / .045),inset 0 1px 0 rgb(255 255 255 / .07); }
+.widget-heading { min-height:34px; display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:15px; }
+.widget-title { color:var(--text); font-size:13px; font-weight:680; letter-spacing:-.012em; }
+.widget-description { margin-top:3px; color:var(--text-3); font-size:10px; }
+.widget-meta { margin-left:auto; color:var(--text-3); font-size:10px; white-space:nowrap; }
+.widget-tools { display:none; align-items:center; gap:4px; margin-left:auto; }
+.widget-tools[hidden] { display:none; }
+.widget-tools button { width:24px; height:23px; border:1px solid var(--line); border-radius:6px; background:var(--bg-raised-2); color:var(--text-2); cursor:pointer; font-size:12px; }
+.widget-tools button:hover { color:var(--text); border-color:var(--accent); }
+.is-editing .widget { position:relative; }
+.is-editing .widget-surface { outline:1px dashed color-mix(in srgb,var(--accent) 52%,transparent); outline-offset:2px; }
+.is-editing .widget-tools { display:flex; }
+.is-editing .widget-meta { display:none; }
+.pulse-surface { padding-bottom:12px; }
+.pulse-row { grid-template-columns:repeat(3,minmax(0,1fr)); margin:0; border:0; border-radius:0; background:transparent; box-shadow:none; backdrop-filter:none; }
+.pulse-cell { min-height:83px; padding:10px 18px 4px; }
+.pulse-cell:first-child { padding-left:2px; }
+.pulse-cell + .pulse-cell { border-left:1px solid var(--line-soft); }
+.pulse-value { font-size:24px; }
+.domain-grid { gap:10px; }
+.domain-card { min-height:130px; padding:15px 16px; }
+.domain-top { margin-bottom:12px; }
+.domain-primary { font-size:14px; }
+.domain-bottom { padding-top:10px; }
+.scene-panel-clean { padding:0; border:0; border-radius:0; background:transparent; box-shadow:none; backdrop-filter:none; }
+.scene-current { padding:2px 0 14px; }
+.scene-context-grid { display:grid; grid-template-columns:1fr 1fr; gap:13px 12px; padding:15px 0 13px; }
+.scene-context-grid > div { min-width:0; display:flex; flex-direction:column; gap:4px; }
+.scene-context-grid span,.scene-next-label { color:var(--text-3); font-size:10px; }
+.scene-context-grid strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); font-size:11px; font-weight:570; }
+.scene-next { padding-top:10px; border-top:1px solid var(--line-soft); }
+.scene-next-row { padding:7px 0; }
+.scene-next-label { padding:0 0 3px; }
+.runtime-heading { align-items:center; }
+.runtime-summary { display:flex; align-items:center; gap:14px; margin-left:auto; }
+.attention-count { display:inline-flex; align-items:center; gap:7px; padding:5px 9px; border-radius:20px; color:var(--amber); background:color-mix(in srgb,var(--amber) 10%,transparent); font-size:10px; white-space:nowrap; }
+.attention-count i { width:6px; height:6px; border-radius:50%; background:var(--amber); }
+.runtime-filters { display:flex; align-items:center; gap:6px; padding:0 0 9px; }
+.filter-chip { display:inline-flex; align-items:center; gap:7px; padding:5px 9px; border:1px solid transparent; border-radius:7px; background:transparent; color:var(--text-3); font:10px var(--sans); cursor:pointer; }
+.filter-chip span { color:inherit; font:10px var(--mono); opacity:.75; }
+.filter-chip:hover { background:var(--bg-hover); color:var(--text); }
+.filter-chip.active { border-color:color-mix(in srgb,var(--accent) 24%,transparent); background:color-mix(in srgb,var(--accent) 12%,transparent); color:var(--text); }
+.runtime-list { border-top:1px solid var(--line-soft); }
+.runtime-row { min-height:51px; display:grid; grid-template-columns:66px 7px minmax(0,1fr) auto 94px; align-items:center; gap:11px; border-bottom:1px solid var(--line-soft); }
+.runtime-row[hidden] { display:none; }
+.runtime-row time { color:var(--text-3); font:10px var(--mono); }
+.runtime-indicator { width:6px; height:6px; border-radius:50%; background:var(--blue); }
+.runtime-indicator.warn { background:var(--amber); box-shadow:0 0 0 4px color-mix(in srgb,var(--amber) 10%,transparent); }
+.runtime-indicator.good { background:var(--green); box-shadow:0 0 0 4px color-mix(in srgb,var(--green) 9%,transparent); }
+.runtime-main { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.runtime-main strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); font-size:11px; font-weight:590; }
+.runtime-main span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-3); font-size:10px; }
+.runtime-status { padding:4px 8px; border-radius:20px; color:var(--text-2); background:var(--bg-raised-2); font-size:9px; white-space:nowrap; }
+.runtime-status.warn { color:var(--amber); background:color-mix(in srgb,var(--amber) 10%,transparent); }
+.runtime-status.good { color:var(--green); background:color-mix(in srgb,var(--green) 9%,transparent); }
+.runtime-status.neutral { color:var(--text-2); }
+.runtime-source { color:var(--text-3); font:9px var(--mono); text-align:right; letter-spacing:.04em; }
+.runtime-footer { display:flex; justify-content:space-between; align-items:center; gap:10px; padding-top:12px; color:var(--text-3); font-size:9px; }
+.text-button { padding:3px 0; border:0; background:transparent; color:var(--accent); font:10px var(--sans); cursor:pointer; white-space:nowrap; }
+.text-button:hover { text-decoration:underline; }
+.added-widget-body { min-height:86px; }
+.mini-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; padding:6px 0 2px; }
+.mini-metrics > div { display:flex; flex-direction:column; gap:6px; }
+.mini-metrics small { color:var(--text-3); font-size:10px; }
+.mini-metrics strong { color:var(--text); font:600 18px var(--mono); }
+.mini-metrics i,.memory-numbers i,.custom-metric i { color:var(--text-3); font-size:10px; font-style:normal; }
+.memory-meter { padding:8px 1px 4px; }
+.memory-numbers { display:flex; align-items:baseline; justify-content:space-between; }
+.memory-numbers strong { font:620 22px var(--mono); }
+.memory-numbers span { color:var(--text-2); font:11px var(--mono); }
+.meter-track { height:7px; margin:13px 0 9px; border-radius:8px; background:var(--bg-raised-2); overflow:hidden; }
+.meter-track i { display:block; height:100%; border-radius:8px; background:var(--accent); }
+.memory-foot { display:flex; justify-content:space-between; color:var(--text-3); font-size:10px; }
+.core-bars { height:104px; display:grid; grid-template-columns:repeat(16,minmax(0,1fr)); align-items:end; gap:6px; padding:4px 0 0; }
+.core-bars > div { height:100%; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; gap:5px; }
+.core-bars i { display:block; width:100%; min-height:4px; border-radius:4px 4px 2px 2px; background:color-mix(in srgb,var(--accent) 70%,var(--text-3)); }
+.core-bars small { color:var(--text-3); font:8px var(--mono); }
+.widget-footnote { margin-top:9px; color:var(--text-3); font-size:9px; }
+.trend-chart { height:115px; }
+.trend-chart svg { width:100%; height:100%; overflow:visible; }
+.chart-gridline { fill:none; stroke:var(--line-soft); stroke-width:1; }
+.chart-line { fill:none; stroke-width:2.5; stroke-linecap:round; }
+.cpu-line { stroke:var(--accent); }
+.gpu-line { stroke:var(--green); }
+.chart-legend { display:flex; gap:16px; margin-top:5px; color:var(--text-2); font-size:10px; }
+.legend-dot { display:inline-block; width:6px; height:6px; margin-right:6px; border-radius:50%; background:var(--accent); }
+.legend-dot.gpu { background:var(--green); }
+.process-focus { padding:7px 0 3px; }
+.process-focus > strong { font:600 14px var(--mono); }
+.process-pill { float:right; padding:4px 8px; border-radius:14px; background:color-mix(in srgb,var(--accent) 12%,transparent); color:var(--accent); font-size:9px; }
+.process-meta { display:flex; gap:26px; margin-top:17px; color:var(--text-3); font-size:10px; }
+.process-meta b { margin-left:5px; color:var(--text); font-weight:600; }
+.quick-actions { display:flex; flex-wrap:wrap; gap:8px; padding:8px 0 0; }
+.quick-actions button { padding:8px 10px; border:1px solid var(--line-soft); border-radius:8px; background:var(--bg-raised-2); color:var(--text-2); font-size:10px; cursor:pointer; }
+.quick-actions button:hover { border-color:var(--accent); color:var(--text); }
+.custom-metric { min-height:75px; display:flex; align-items:baseline; gap:6px; padding:10px 0; }
+.custom-metric strong { color:var(--text); font:650 27px var(--mono); }
+.custom-metric span { align-self:flex-end; margin-left:auto; color:var(--text-3); font-size:10px; }
+.custom-note { padding:12px 0; color:var(--text-2); font-size:12px; line-height:1.6; }
+.modal-backdrop { position:fixed; z-index:50; inset:0; display:flex; align-items:center; justify-content:center; padding:24px; background:rgb(7 9 13 / .55); backdrop-filter:blur(12px); }
+.modal-backdrop[hidden] { display:none; }
+.component-modal { width:min(720px,100%); max-height:min(780px,90vh); display:flex; flex-direction:column; overflow:hidden; border:1px solid var(--line); border-radius:20px; background:color-mix(in srgb,var(--bg-app) 88%,#42404a); box-shadow:0 28px 90px rgb(0 0 0 / .38),inset 0 1px 0 rgb(255 255 255 / .09); }
+.modal-header { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; padding:22px 24px 17px; }
+.modal-kicker { color:var(--accent); font:9px var(--mono); letter-spacing:.12em; }
+.modal-header h2 { margin:5px 0 4px; color:var(--text); font-size:19px; letter-spacing:-.03em; }
+.modal-header p { margin:0; color:var(--text-3); font-size:10px; }
+.modal-close { width:30px; height:30px; border:0; border-radius:8px; background:var(--bg-raised-2); color:var(--text-2); font-size:18px; cursor:pointer; }
+.modal-close:hover { color:var(--text); background:var(--bg-hover); }
+.modal-tabs { display:flex; gap:20px; padding:0 24px; border-bottom:1px solid var(--line-soft); }
+.modal-tab { position:relative; padding:11px 1px; border:0; background:transparent; color:var(--text-3); font-size:11px; cursor:pointer; }
+.modal-tab.active { color:var(--text); }
+.modal-tab.active::after { content:""; position:absolute; left:0; right:0; bottom:-1px; height:2px; border-radius:2px; background:var(--accent); }
+.modal-body { padding:18px 24px 23px; overflow:auto; }
+.library-intro { display:flex; justify-content:space-between; gap:10px; margin-bottom:11px; color:var(--text-2); font-size:10px; }
+.library-intro span:last-child { color:var(--text-3); }
+.component-catalog { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+.catalog-item { min-width:0; min-height:82px; display:grid; grid-template-columns:39px minmax(0,1fr) auto; align-items:center; gap:10px; padding:11px; border:1px solid var(--line-soft); border-radius:11px; background:var(--bg-raised); }
+.catalog-item.is-added { opacity:.72; }
+.catalog-icon { width:37px; height:37px; display:grid; place-items:center; border-radius:10px; background:color-mix(in srgb,var(--accent) 12%,transparent); color:var(--accent); font:9px var(--mono); }
+.catalog-item strong { color:var(--text); font-size:11px; font-weight:620; }
+.catalog-item p { margin:3px 0 2px; color:var(--text-2); font-size:9px; }
+.catalog-item small { color:var(--text-3); font-size:8px; }
+.catalog-item button { padding:6px 8px; border:1px solid var(--line); border-radius:7px; background:var(--bg-raised-2); color:var(--text-2); font-size:9px; cursor:pointer; }
+.catalog-item button:hover:not(:disabled) { border-color:var(--accent); color:var(--text); }
+.catalog-item button:disabled { opacity:.6; cursor:default; }
+.catalog-note { display:flex; gap:9px; margin-top:14px; padding:10px 11px; border-radius:9px; background:var(--bg-raised); color:var(--text-3); font-size:9px; line-height:1.55; }
+.note-mark { flex:0 0 15px; width:15px; height:15px; display:grid; place-items:center; border:1px solid var(--line); border-radius:50%; color:var(--text-2); font:9px var(--mono); }
+.form-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.form-field { display:flex; flex-direction:column; gap:6px; color:var(--text-2); font-size:10px; }
+.form-field input,.form-field select { width:100%; height:36px; padding:0 10px; border:1px solid var(--line); border-radius:8px; outline:none; background:var(--bg-raised); color:var(--text); font:11px var(--sans); }
+.form-field input:focus,.form-field select:focus { border-color:var(--accent); }
+.span-full { grid-column:1/-1; }
+.custom-preview { display:flex; align-items:flex-start; gap:16px; margin-top:19px; padding:13px; border:1px solid var(--line-soft); border-radius:11px; background:var(--bg-raised); }
+.custom-preview > span { padding-top:2px; color:var(--text-3); font-size:9px; }
+.custom-preview-card { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.custom-preview-card small { color:var(--text-2); font-size:10px; }
+.custom-preview-card strong { color:var(--text); font:620 21px var(--mono); }
+.custom-preview-card strong i { color:var(--text-3); font-size:10px; font-style:normal; }
+.custom-preview-card em { color:var(--text-3); font-size:9px; font-style:normal; }
+.form-actions { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:17px; }
+.form-actions > span { color:var(--text-3); font-size:9px; }
+.form-actions .primary-button { height:34px; }
+
+.custom-managed { margin-top:17px; padding-top:13px; border-top:1px solid var(--line-soft); }
+.custom-managed[hidden] { display:none; }
+.custom-managed-title { margin-bottom:8px; color:var(--text-2); font-size:10px; }
+.custom-managed-row { min-height:38px; display:grid; grid-template-columns:minmax(0,1fr) auto auto auto; align-items:center; gap:9px; padding:5px 8px; border-radius:8px; background:var(--bg-raised); }
+.custom-managed-row + .custom-managed-row { margin-top:5px; }
+.custom-managed-row strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); font-size:10px; }
+.custom-managed-row span { color:var(--text-3); font-size:9px; }
+.custom-managed-row button { padding:5px 8px; border:1px solid var(--line); border-radius:6px; background:var(--bg-raised-2); color:var(--text-2); font-size:9px; cursor:pointer; }
+.custom-managed-row button:disabled { opacity:.55; cursor:default; }
+.custom-managed-row .remove-custom { color:var(--red); }
+
+body.modal-open { overflow:hidden; }
+html[data-theme="light"] .widget-surface,html[data-theme="light"] .component-modal { box-shadow:0 15px 45px rgb(75 55 70 / .09),inset 0 1px 0 rgb(255 255 255 / .72); }
+html[data-theme="light"] .modal-backdrop { background:rgb(42 37 44 / .28); }
+@media (max-width:1100px) { .widget.span-7,.widget.span-8 { grid-column:span 7; } .widget.span-5 { grid-column:span 5; } }
+@media (max-width:820px) { .widget-grid { grid-template-columns:repeat(6,minmax(0,1fr)); } .widget,.widget.span-4,.widget.span-5,.widget.span-6,.widget.span-7,.widget.span-8 { grid-column:span 3; } .widget.span-12 { grid-column:span 6; } .page-tools .layout-hint { display:none; } .runtime-row { grid-template-columns:57px 7px minmax(0,1fr) auto; } .runtime-source { display:none; } }
+@media (max-width:560px) { .page-head { gap:8px; } .page-title { font-size:15px; } .page-tools { gap:5px; } .page-tools .ghost-button,.page-tools .primary-button { height:29px; padding:0 8px; font-size:9px; } .widget-grid { display:flex; flex-direction:column; } .widget { width:100%; } .widget-surface { padding:15px; } .pulse-row { grid-template-columns:1fr 1fr 1fr; } .pulse-cell { min-height:70px; padding:8px 7px; } .pulse-value { font-size:17px; } .pulse-unit { font-size:9px; } .pulse-label { font-size:9px; } .pulse-foot { font-size:8px; } .runtime-row { grid-template-columns:47px 6px minmax(0,1fr) auto; gap:7px; min-height:58px; } .runtime-row time { font-size:8px; } .runtime-status { padding:3px 6px; font-size:8px; } .runtime-main strong { font-size:10px; } .runtime-main span { font-size:9px; } .runtime-filters { flex-wrap:wrap; } .runtime-footer { align-items:flex-start; } .runtime-footer > span { max-width:62%; line-height:1.5; } .runtime-summary .widget-meta { display:none; } .component-catalog,.form-grid { grid-template-columns:1fr; } .span-full { grid-column:auto; } .modal-backdrop { padding:10px; } .modal-header,.modal-body { padding-left:16px; padding-right:16px; } .library-intro span:last-child { display:none; } .catalog-item { grid-template-columns:35px minmax(0,1fr) auto; } .mini-metrics { grid-template-columns:1fr 1fr; row-gap:15px; } .scene-context-grid { gap:11px 8px; } .scene-context-grid strong { font-size:10px; } }
+@media (prefers-reduced-motion:reduce) { .primary-button,.widget-tools button,.catalog-item button { transition:none; } }
+
+</style>
+</head>
+<body>
+<div class="prototype-bar" aria-label="原型控制栏">
+  <div class="proto-left"><span class="proto-name">Zentwik Next</span><span class="proto-tag">Modular Glass Workspace · v3</span><span class="proto-demo">演示数据</span></div>
+  <div class="proto-tools" aria-label="原型外观控制">
+    <button type="button" data-theme="dark" aria-pressed="true">深色</button>
+    <button type="button" data-theme="light" aria-pressed="false">浅色</button>
+    <button type="button" data-density="compact" aria-pressed="false">紧凑</button>
+    <button type="button" data-density="standard" aria-pressed="true">标准</button>
+    <button type="button" data-density="relaxed" aria-pressed="false">宽松</button>
+    <input id="accentPicker" type="color" value="#6795ff" aria-label="自定义强调色" title="自定义强调色">
+  </div>
+</div>
+<div class="app-frame">
+  <header class="titlebar">
+    <div class="system-context">
+      <span class="connected-dot" aria-hidden="true"></span>
+      <span class="context-brand">Zentwik</span>
+      <span class="context-divider"></span>
+      <span class="context-hardware">Ryzen 9 9955HX · 16C / 32T</span>
+      <span class="context-divider"></span>
+      <span class="context-state">AC · Agent 已连接</span>
+    </div>
+    <div class="title-actions">
+      <button class="icon-button" id="sceneButton" type="button" aria-label="场景快控" aria-expanded="false" title="场景快控">
+        <svg viewBox="0 0 24 24"><path d="M13 2 4 13h7l-1 9 10-12h-7z"/></svg>
+      </button>
+      <button class="icon-button" id="runtimeButton" type="button" aria-label="跳转到运行记录" title="运行记录 · 1 项需关注">
+        <svg viewBox="0 0 24 24"><path d="M8 4H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2"/><rect x="9" y="2" width="6" height="5" rx="1"/><path d="m8 13 2 2 5-5"/></svg>
+        <span class="action-count" aria-hidden="true"></span>
+      </button>
+      <button class="window-button" type="button" title="最小化" aria-label="最小化"><svg viewBox="0 0 12 12"><path d="M1 6h10"/></svg></button>
+      <button class="window-button" type="button" title="最大化" aria-label="最大化"><svg viewBox="0 0 12 12"><rect x="1.5" y="1.5" width="9" height="9"/></svg></button>
+      <button class="window-button close" type="button" title="关闭" aria-label="关闭"><svg viewBox="0 0 12 12"><path d="m2 2 8 8M10 2l-8 8"/></svg></button>
+    </div>
+  </header>
+  <div class="workspace">
+    <aside class="sidebar" id="sidebar" aria-label="主导航">
+      <div>
+        <button class="brand-button" id="brandToggle" type="button" aria-label="折叠或展开导航栏" title="折叠或展开导航栏">
+          <svg class="brand-mark" viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="M14 1.8 25.2 8v12L14 26.2 2.8 20V8z" stroke="var(--accent)" stroke-width="1.6"/><path d="M9 9h10L9 19h10" stroke="var(--text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="brand-label">Zentwik</span>
+        </button>
+        <div class="nav-label-group">工作区</div>
+        <nav class="nav-list">
+          <button class="nav-item active" type="button" aria-current="page" title="首页总览"><span class="nav-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="5" rx="1"/><rect x="13" y="10" width="8" height="11" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/></svg></span><span class="nav-label">首页总览</span></button>
+          <button class="nav-item" type="button" title="CPU 调校"><span class="nav-icon"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4m6-4v4m-6 12v4m6-4v4M2 9h4m-4 6h4m12-6h4m-4 6h4"/></svg></span><span class="nav-label">CPU 调校</span></button>
+          <button class="nav-item" type="button" title="电源管理"><span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M18.4 6.6a9 9 0 1 1-12.8 0M12 2v10"/></svg></span><span class="nav-label">电源管理</span></button>
+          <button class="nav-item" type="button" title="进程与调度"><span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></span><span class="nav-label">进程与调度</span></button>
+          <button class="nav-item" type="button" title="场景自动化"><span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M13 2 4 13h7l-1 9 10-12h-7z"/></svg></span><span class="nav-label">场景自动化</span></button>
+          <button class="nav-item" type="button" title="方案库"><span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5zM4 19.5V4.5"/></svg></span><span class="nav-label">方案库</span></button>
+        </nav>
+      </div>
+      <div class="nav-bottom">
+        <nav class="nav-list">
+          <button class="nav-item" type="button" title="能力与诊断"><span class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-8h.01"/></svg></span><span class="nav-label">能力与诊断</span></button>
+          <button class="nav-item" type="button" title="系统设置"><span class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="m19.4 15 .1.1 1.3 1.3-2.8 2.8-1.4-1.4a8 8 0 0 1-1.5.6V21h-4v-2.1a8 8 0 0 1-1.5-.6l-1.4 1.4-2.8-2.8L6.8 15.5a8 8 0 0 1-.6-1.5H4v-4h2.2a8 8 0 0 1 .6-1.5L5.4 7.1l2.8-2.8 1.4 1.4a8 8 0 0 1 1.5-.6V3h4v2.1a8 8 0 0 1 1.5.6L18 4.3l2.8 2.8-1.4 1.4a8 8 0 0 1 .6 1.5H22v4h-2.2a8 8 0 0 1-.4 1z"/></svg></span><span class="nav-label">系统设置</span></button>
+        </nav>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="page-head">
+        <div class="page-title">首页总览 <span class="page-state"><span class="connected-dot" aria-hidden="true"></span>运行正常</span></div>
+        <div class="page-tools">
+          <span class="layout-hint" id="layoutHint">组件可按需添加与排列</span>
+          <button class="ghost-button" id="editLayoutButton" type="button" aria-pressed="false">编辑布局</button>
+          <button class="primary-button" id="addWidgetButton" type="button"><span aria-hidden="true">＋</span> 添加组件</button>
+        </div>
+      </header>
+      <div class="content-scroll">
+        <div class="widget-grid" id="widgetGrid" aria-label="首页组件区域">
+          <section class="widget span-12" id="widget-pulse" data-widget-id="pulse" aria-labelledby="pulseHeading">
+            <div class="widget-surface pulse-surface">
+              <div class="widget-heading"><div><div class="widget-title" id="pulseHeading">系统脉搏</div><div class="widget-description">关键硬件遥测</div></div><span class="widget-meta">示例快照 · 仅用于界面预览</span><div class="widget-tools" aria-label="组件操作"></div></div>
+              <div class="pulse-row">
+                <div class="pulse-cell"><div class="pulse-label">封装功耗</div><div class="pulse-value-row"><span class="pulse-value">78.4</span><span class="pulse-unit">W</span></div><div class="pulse-foot">PPT 140 W</div></div>
+                <div class="pulse-cell"><div class="pulse-label">核心温度</div><div class="pulse-value-row"><span class="pulse-value">68.2</span><span class="pulse-unit">°C</span></div><div class="pulse-foot">TjMax 95 °C</div></div>
+                <div class="pulse-cell"><div class="pulse-label">有效频率</div><div class="pulse-value-row"><span class="pulse-value">5.28</span><span class="pulse-unit">GHz</span></div><div class="pulse-foot">16 核 · 32 线程</div></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="widget span-7" id="widget-domains" data-widget-id="domains" aria-labelledby="domainsHeading">
+            <div class="widget-surface">
+              <div class="widget-heading"><div><div class="widget-title" id="domainsHeading">功能域</div><div class="widget-description">按已安装且可用的能力动态显示</div></div><span class="widget-meta">4 个已就绪</span><div class="widget-tools" aria-label="组件操作"></div></div>
+              <div class="domain-grid">
+                <article class="domain-card">
+                  <div class="domain-top"><div class="domain-title"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4m6-4v4m-6 12v4m6-4v4M2 9h4m-4 6h4m12-6h4m-4 6h4"/></svg>CPU 调校</div><span class="state"><span class="state-dot"></span>已连接</span></div>
+                  <div class="domain-primary">AMD SMU · Curve Optimizer</div><div class="domain-secondary">逐核偏移 · 16 / 16 可读取</div>
+                  <div class="domain-bottom"><span>当前方案：日常均衡</span></div>
+                </article>
+                <article class="domain-card">
+                  <div class="domain-top"><div class="domain-title"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>进程与调度</div><span class="state"><span class="state-dot warn"></span>需关注</span></div>
+                  <div class="domain-primary">3 条活跃规则</div><div class="domain-secondary">2 条已对齐 · 1 项用户接管</div>
+                  <div class="domain-bottom"><span>CPU Sets · Affinity</span></div>
+                </article>
+                <article class="domain-card">
+                  <div class="domain-top"><div class="domain-title"><svg viewBox="0 0 24 24"><path d="M18.4 6.6a9 9 0 1 1-12.8 0M12 2v10"/></svg>电源管理</div><span class="state"><span class="state-dot"></span>已连接</span></div>
+                  <div class="domain-primary">Zentwik 性能强化</div><div class="domain-secondary">Windows 电源计划 · AC</div>
+                  <div class="domain-bottom"><span>独立电源方案</span></div>
+                </article>
+                <article class="domain-card">
+                  <div class="domain-top"><div class="domain-title"><svg viewBox="0 0 24 24"><path d="M13 2 4 13h7l-1 9 10-12h-7z"/></svg>场景自动化</div><span class="state"><span class="state-dot"></span>运行中</span></div>
+                  <div class="domain-primary">3 条规则已启用</div><div class="domain-secondary">1 条规则当前命中</div>
+                  <div class="domain-bottom"><span>按域独立仲裁 · 优先级 P10</span></div>
+                </article>
+              </div>
+            </div>
+          </section>
+
+          <section class="widget span-5" id="widget-scene" data-widget-id="scene" aria-labelledby="sceneHeading">
+            <div class="widget-surface">
+              <div class="widget-heading"><div><div class="widget-title" id="sceneHeading">当前场景</div><div class="widget-description">当前命中与触发上下文</div></div><div class="widget-tools" aria-label="组件操作"></div></div>
+              <div class="scene-panel scene-panel-clean">
+                <div class="scene-current"><div class="scene-name"><span class="scene-symbol"><svg viewBox="0 0 24 24"><path d="M13 2 4 13h7l-1 9 10-12h-7z"/></svg></span>大型游戏</div><span class="active-pill">生效中</span></div>
+                <div class="scene-context-grid">
+                  <div><span>触发来源</span><strong>helldivers2.exe</strong></div>
+                  <div><span>覆盖域</span><strong>CPU 调校 · 电源管理</strong></div>
+                  <div><span>规则优先级</span><strong>#1 · P10</strong></div>
+                  <div><span>退出行为</span><strong>恢复先前状态</strong></div>
+                </div>
+                <div class="scene-next">
+                  <div class="scene-next-label">其他已启用规则</div>
+                  <div class="scene-next-row"><span>插入交流电源</span><span>待命 · P5</span></div>
+                  <div class="scene-next-row"><span>夜间静音</span><span>未命中 · P3</span></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="widget span-12" id="widget-runtime" data-widget-id="runtime" aria-labelledby="runtimeHeading">
+            <div class="widget-surface">
+              <div class="widget-heading runtime-heading"><div><div class="widget-title" id="runtimeHeading">运行记录</div><div class="widget-description">将状态核对、用户接管与运行事件合并为一条记录流</div></div><div class="runtime-summary"><span class="attention-count"><i></i>1 项需关注</span><span class="widget-meta">最近更新 · 23:54:08</span></div><div class="widget-tools" aria-label="组件操作"></div></div>
+              <div class="runtime-filters" role="group" aria-label="运行记录筛选"><button class="filter-chip active" type="button" data-runtime-filter="all">全部 <span>6</span></button><button class="filter-chip" type="button" data-runtime-filter="attention">需关注 <span>1</span></button><button class="filter-chip" type="button" data-runtime-filter="state">状态核对 <span>3</span></button><button class="filter-chip" type="button" data-runtime-filter="event">运行事件 <span>3</span></button></div>
+              <div class="runtime-list" id="runtimeList">
+                <article class="runtime-row" data-kind="event"><time>23:54:08</time><span class="runtime-indicator"></span><div class="runtime-main"><strong>场景「大型游戏」命中</strong><span>进程 helldivers2.exe 满足规则 #1，CPU 与电源域动作生效</span></div><span class="runtime-status neutral">已触发</span><span class="runtime-source">SCENE</span></article>
+                <article class="runtime-row" data-kind="state" data-attention="true"><time>23:48:31</time><span class="runtime-indicator warn"></span><div class="runtime-main"><strong>obs64.exe · 进程亲和性</strong><span>外部修改目标值，当前由用户接管</span></div><span class="runtime-status warn">用户接管</span><span class="runtime-source">SCHEDULING</span></article>
+                <article class="runtime-row" data-kind="state"><time>23:12:04</time><span class="runtime-indicator good"></span><div class="runtime-main"><strong>AMD SMU · Curve Optimizer</strong><span>写入值与回读一致</span></div><span class="runtime-status good">已对齐</span><span class="runtime-source">CPU</span></article>
+                <article class="runtime-row" data-kind="state"><time>22:55:19</time><span class="runtime-indicator good"></span><div class="runtime-main"><strong>Windows 电源计划</strong><span>期望状态与实际状态一致</span></div><span class="runtime-status good">已对齐</span><span class="runtime-source">POWER</span></article>
+                <article class="runtime-row" data-kind="event"><time>22:44:32</time><span class="runtime-indicator"></span><div class="runtime-main"><strong>电源状态变化</strong><span>系统从 DC 切换至 AC，重新仲裁场景规则</span></div><span class="runtime-status neutral">已更新</span><span class="runtime-source">POWER</span></article>
+                <article class="runtime-row" data-kind="event"><time>22:40:05</time><span class="runtime-indicator"></span><div class="runtime-main"><strong>启动保护校验通过</strong><span>启动项与当前配置一致</span></div><span class="runtime-status neutral">已通过</span><span class="runtime-source">AGENT</span></article>
+              </div>
+              <div class="runtime-footer"><span>状态类记录展示最近一次核对结果；事件类记录保留时间顺序。</span><button type="button" class="text-button" id="viewAllRuntime">查看完整记录 <span aria-hidden="true">↗</span></button></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<div class="popover" id="popover" role="dialog" aria-modal="false" aria-labelledby="popoverTitle" hidden>
+  <div class="popover-head"><span id="popoverTitle">场景快控</span><button class="popover-close" id="popoverClose" type="button" aria-label="关闭">×</button></div>
+  <div id="popoverBody"></div>
+</div>
+
+<div class="modal-backdrop" id="componentModal" hidden>
+  <section class="component-modal" role="dialog" aria-modal="true" aria-labelledby="componentModalTitle">
+    <header class="modal-header"><div><div class="modal-kicker">DASHBOARD LIBRARY</div><h2 id="componentModalTitle">添加组件</h2><p>把需要的信息加入首页。组件可独立隐藏、调整宽度和排序。</p></div><button class="modal-close" id="closeComponentModal" type="button" aria-label="关闭">×</button></header>
+    <div class="modal-tabs" role="tablist"><button class="modal-tab active" type="button" data-modal-tab="library" role="tab" aria-selected="true">组件库</button><button class="modal-tab" type="button" data-modal-tab="custom" role="tab" aria-selected="false">自定义组件</button></div>
+    <div class="modal-body" id="componentLibraryPanel" role="tabpanel">
+      <div class="library-intro"><span>可添加的组件</span><span>组件能力随安装状态动态出现</span></div>
+      <div class="component-catalog" id="componentCatalog">
+        <article class="catalog-item" data-component="gpu"><div class="catalog-icon">GPU</div><div><strong>GPU 状态</strong><p>显存、温度、频率与功耗</p><small>硬件遥测 · 中等宽度</small></div><button type="button" data-add-component="gpu">添加</button></article>
+        <article class="catalog-item" data-component="memory"><div class="catalog-icon">MEM</div><div><strong>内存占用</strong><p>物理内存使用量与占用率</p><small>系统监控 · 中等宽度</small></div><button type="button" data-add-component="memory">添加</button></article>
+        <article class="catalog-item" data-component="cores"><div class="catalog-icon">CPU</div><div><strong>CPU 核心负载</strong><p>按核心展示实时负载分布</p><small>硬件遥测 · 宽组件</small></div><button type="button" data-add-component="cores">添加</button></article>
+        <article class="catalog-item" data-component="thermal"><div class="catalog-icon">TMP</div><div><strong>温度趋势</strong><p>CPU 与 GPU 温度变化趋势</p><small>历史监控 · 宽组件</small></div><button type="button" data-add-component="thermal">添加</button></article>
+        <article class="catalog-item" data-component="process"><div class="catalog-icon">PID</div><div><strong>进程焦点</strong><p>前台进程、CPU 占用与调度状态</p><small>进程监控 · 中等宽度</small></div><button type="button" data-add-component="process">添加</button></article>
+        <article class="catalog-item" data-component="quick"><div class="catalog-icon">ACT</div><div><strong>快捷操作</strong><p>常用场景、方案与即时操作入口</p><small>快捷入口 · 中等宽度</small></div><button type="button" data-add-component="quick">添加</button></article>
+      </div>
+      <div class="custom-managed" id="customManaged" hidden></div>
+      <div class="catalog-note"><span class="note-mark">i</span><span>未安装或当前硬件不支持的组件默认不显示。后续扩展可通过组件注册接口接入，不需要改动首页网格结构。</span></div>
+    </div>
+    <div class="modal-body custom-panel" id="customComponentPanel" role="tabpanel" hidden>
+      <form id="customComponentForm">
+        <div class="form-grid">
+          <label class="form-field span-full"><span>组件名称</span><input id="customTitle" maxlength="24" placeholder="例如：显卡热点温度" required></label>
+          <label class="form-field"><span>数据来源</span><select id="customSource"><option value="manual">自定义数值</option><option value="cpu-temp">CPU 温度</option><option value="gpu-temp">GPU 温度</option><option value="memory">内存占用</option><option value="process-count">运行进程数</option></select></label>
+          <label class="form-field"><span>显示方式</span><select id="customDisplay"><option value="metric">单值指标</option><option value="note">信息便笺</option></select></label>
+          <label class="form-field" id="customValueField"><span>当前数值</span><input id="customValue" maxlength="12" placeholder="例如：72.5"></label>
+          <label class="form-field" id="customUnitField"><span>单位</span><input id="customUnit" maxlength="8" placeholder="例如：°C"></label>
+          <label class="form-field span-full"><span>补充说明</span><input id="customDescription" maxlength="56" placeholder="显示在指标下方的说明文字"></label>
+        </div>
+        <div class="custom-preview"><span>预览</span><div class="custom-preview-card"><small id="previewTitle">自定义组件</small><strong id="previewValue">72.5 <i>°C</i></strong><em id="previewDescription">补充说明</em></div></div>
+        <div class="form-actions"><span>自定义组件保存在本机布局中</span><button class="primary-button" type="submit">创建并添加</button></div>
+      </form>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const root = document.documentElement;
+  const sidebar = document.getElementById('sidebar');
+  const popover = document.getElementById('popover');
+  const popoverTitle = document.getElementById('popoverTitle');
+  const popoverBody = document.getElementById('popoverBody');
+  const sceneButton = document.getElementById('sceneButton');
+  const runtimeButton = document.getElementById('runtimeButton');
+  const grid = document.getElementById('widgetGrid');
+  const modal = document.getElementById('componentModal');
+  const libraryPanel = document.getElementById('componentLibraryPanel');
+  const customPanel = document.getElementById('customComponentPanel');
+  const STORAGE_KEY = 'zentwik.home.v3.layout';
+  const CUSTOM_KEY = 'zentwik.home.v3.custom';
+  const BUILTINS = {
+    gpu: { title: 'GPU 状态', desc: 'NVIDIA GeForce RTX 5070 Ti Laptop', span: 6, source: '硬件遥测', html: '<div class="mini-metrics"><div><small>核心温度</small><strong>67.4 <i>°C</i></strong></div><div><small>核心频率</small><strong>2,460 <i>MHz</i></strong></div><div><small>功耗</small><strong>142 <i>W</i></strong></div><div><small>显存</small><strong>7.8 / 12 <i>GB</i></strong></div></div>' },
+    memory: { title: '内存占用', desc: '物理内存 · 32 GB', span: 4, source: '系统监控', html: '<div class="memory-meter"><div class="memory-numbers"><strong>19.6 <i>GB</i></strong><span>61.3%</span></div><div class="meter-track"><i style="width:61.3%"></i></div><div class="memory-foot"><span>已使用 19.6 GB</span><span>可用 12.4 GB</span></div></div>' },
+    cores: { title: 'CPU 核心负载', desc: '16 个物理核心 · 当前负载', span: 8, source: '硬件遥测', html: '<div class="core-bars">' + [22,34,18,52,67,41,28,76,38,49,21,61,32,44,18,56].map((v,i)=>'<div><i style="height:'+v+'%"></i><small>'+(i+1)+'</small></div>').join('') + '</div><div class="widget-footnote">平均负载 39.8% · 最高核心 Core 8</div>' },
+    thermal: { title: '温度趋势', desc: '最近 10 分钟 · 示例数据', span: 8, source: '历史监控', html: '<div class="trend-chart"><svg viewBox="0 0 620 118" preserveAspectRatio="none" aria-label="CPU 和 GPU 温度趋势"><path class="chart-gridline" d="M0 20H620M0 58H620M0 96H620"/><path class="chart-line cpu-line" d="M0 74 C35 68 48 82 82 63 S132 58 165 64 S220 39 260 52 S312 63 350 44 S405 35 445 48 S510 38 550 30 S590 41 620 26"/><path class="chart-line gpu-line" d="M0 93 C36 84 60 92 90 82 S145 88 180 73 S228 85 265 78 S325 70 360 82 S415 69 455 75 S520 64 560 72 S600 65 620 58"/></svg></div><div class="chart-legend"><span><i class="legend-dot cpu"></i>CPU · 68.2 °C</span><span><i class="legend-dot gpu"></i>GPU · 67.4 °C</span></div>' },
+    process: { title: '进程焦点', desc: '前台进程与调度状态', span: 6, source: '进程监控', html: '<div class="process-focus"><strong>helldivers2.exe</strong><span class="process-pill">前台进程</span><div class="process-meta"><span>CPU 占用 <b>24.8%</b></span><span>调度目标 <b>游戏核心组</b></span></div></div>' },
+    quick: { title: '快捷操作', desc: '常用方案与场景入口', span: 4, source: '快捷入口', html: '<div class="quick-actions"><button type="button" data-quick="game">大型游戏</button><button type="button" data-quick="balanced">日常均衡</button><button type="button" data-quick="silent">夜间静音</button></div><div class="widget-footnote">演示入口 · 实际操作由对应功能域处理</div>' }
+  };
+
+  let editMode = false;
+  let hiddenWidgets = new Set();
+  let customWidgets = [];
+  let savedOrder = null;
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    hiddenWidgets = new Set(saved.hidden || []);
+    if (Array.isArray(saved.order)) savedOrder = saved.order;
+    const custom = JSON.parse(localStorage.getItem(CUSTOM_KEY) || '[]');
+    if (Array.isArray(custom)) customWidgets = custom;
+  } catch (_) {}
+
+  function persistLayout() {
+    const order = [...grid.children].map(node => node.dataset.widgetId);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ hidden: [...hiddenWidgets], order })); } catch (_) {}
+    try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(customWidgets)); } catch (_) {}
+  }
+
+  function syncHidden() {
+    [...grid.children].forEach(node => { node.hidden = hiddenWidgets.has(node.dataset.widgetId); });
+  }
+  function setEditMode(on) {
+    editMode = on;
+    grid.classList.toggle('is-editing', on);
+    document.getElementById('editLayoutButton').setAttribute('aria-pressed', String(on));
+    document.getElementById('editLayoutButton').textContent = on ? '完成布局' : '编辑布局';
+    document.getElementById('layoutHint').textContent = on ? '可调整组件顺序、宽度或从首页隐藏' : '组件可按需添加与排列';
+    [...grid.querySelectorAll('.widget')].forEach(addWidgetTools);
+  }
+  function widgetToolsMarkup() {
+    return '<button type="button" data-widget-action="up" title="上移" aria-label="上移">↑</button><button type="button" data-widget-action="down" title="下移" aria-label="下移">↓</button><button type="button" data-widget-action="size" title="调整宽度" aria-label="调整宽度">↔</button><button type="button" data-widget-action="hide" title="从首页隐藏" aria-label="从首页隐藏">−</button>';
+  }
+  function addWidgetTools(node) {
+    const tools = node.querySelector('.widget-tools');
+    if (!tools) return;
+    tools.innerHTML = editMode ? widgetToolsMarkup() : '';
+    tools.hidden = !editMode;
+  }
+  function applySavedState() {
+    syncHidden();
+    [...grid.querySelectorAll('.widget')].forEach(addWidgetTools);
+  }
+
+  function makeWidget(id, config, isCustom = false) {
+    const section = document.createElement('section');
+    section.className = 'widget span-' + (config.span || 6);
+    section.dataset.widgetId = id;
+    if (isCustom) section.dataset.custom = 'true';
+    const surface = document.createElement('div'); surface.className = 'widget-surface';
+    const heading = document.createElement('div'); heading.className = 'widget-heading';
+    const titleWrap = document.createElement('div');
+    const title = document.createElement('div'); title.className = 'widget-title'; title.textContent = config.title;
+    const desc = document.createElement('div'); desc.className = 'widget-description'; desc.textContent = config.desc || config.source || '';
+    titleWrap.append(title, desc);
+    const meta = document.createElement('span'); meta.className = 'widget-meta'; meta.textContent = config.source || (isCustom ? '用户组件' : '组件');
+    const tools = document.createElement('div'); tools.className = 'widget-tools'; tools.setAttribute('aria-label','组件操作');
+    heading.append(titleWrap, meta, tools);
+    const body = document.createElement('div'); body.className = 'added-widget-body';
+    if (isCustom) {
+      if (config.display === 'note') {
+        const note = document.createElement('div'); note.className = 'custom-note'; note.textContent = config.description || config.value || '尚未填写内容'; body.appendChild(note);
+      } else {
+        const metric = document.createElement('div'); metric.className = 'custom-metric';
+        const value = document.createElement('strong'); value.textContent = config.value || '0';
+        const unit = document.createElement('i'); unit.textContent = config.unit || '';
+        const caption = document.createElement('span'); caption.textContent = config.description || '自定义指标';
+        metric.append(value, unit, caption); body.appendChild(metric);
+      }
+    } else {
+      body.innerHTML = config.html;
+    }
+    surface.append(heading, body); section.appendChild(surface); return section;
+  }
+  function addBuiltin(id) {
+    if (grid.querySelector('[data-widget-id="'+id+'"]')) {
+      const existing = grid.querySelector('[data-widget-id="'+id+'"]');
+      existing.hidden = false; hiddenWidgets.delete(id); persistLayout(); refreshCatalog(); return;
+    }
+    const config = BUILTINS[id]; if (!config) return;
+    const node = makeWidget(id, config, false); grid.appendChild(node); addWidgetTools(node); persistLayout(); refreshCatalog();
+  }
+  function renderCustomWidget(config) {
+    if (grid.querySelector('[data-widget-id="'+config.id+'"]')) return;
+    const node = makeWidget(config.id, config, true); grid.appendChild(node); addWidgetTools(node);
+  }
+  customWidgets.forEach(renderCustomWidget);
+  if (savedOrder) {
+    const nodes = new Map([...grid.children].map(node => [node.dataset.widgetId, node]));
+    savedOrder.forEach(id => { const node = nodes.get(id); if (node) grid.appendChild(node); });
+  }
+  applySavedState();
+
+  function refreshCatalog() {
+    document.querySelectorAll('[data-component]').forEach(item => {
+      const id = item.dataset.component;
+      const exists = grid.querySelector('[data-widget-id="'+id+'"]');
+      const hidden = hiddenWidgets.has(id);
+      const btn = item.querySelector('[data-add-component]');
+      if (btn) { btn.textContent = exists && !hidden ? '已添加' : (exists && hidden ? '恢复' : '添加'); btn.disabled = !!(exists && !hidden); }
+      item.classList.toggle('is-added', !!(exists && !hidden));
+    });
+    const manager = document.getElementById('customManaged');
+    manager.replaceChildren();
+    manager.hidden = customWidgets.length === 0;
+    if (customWidgets.length) {
+      const heading = document.createElement('div'); heading.className = 'custom-managed-title'; heading.textContent = '已创建的自定义组件'; manager.appendChild(heading);
+      customWidgets.forEach(config => {
+        const row = document.createElement('div'); row.className = 'custom-managed-row';
+        const name = document.createElement('strong'); name.textContent = config.title;
+        const state = document.createElement('span'); state.textContent = hiddenWidgets.has(config.id) ? '已隐藏' : '首页可见';
+        const restore = document.createElement('button'); restore.type = 'button'; restore.textContent = hiddenWidgets.has(config.id) ? '恢复' : '已添加'; restore.disabled = !hiddenWidgets.has(config.id);
+        restore.addEventListener('click', () => { hiddenWidgets.delete(config.id); const node = grid.querySelector('[data-widget-id="'+config.id+'"]'); if (node) node.hidden = false; persistLayout(); refreshCatalog(); });
+        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'remove-custom'; remove.textContent = '删除';
+        remove.addEventListener('click', () => { const node = grid.querySelector('[data-widget-id="'+config.id+'"]'); if (node) node.remove(); hiddenWidgets.delete(config.id); customWidgets = customWidgets.filter(item => item.id !== config.id); persistLayout(); refreshCatalog(); });
+        row.append(name,state,restore,remove); manager.appendChild(row);
+      });
+    }
+  }
+
+  const closePopover = () => { popover.hidden = true; sceneButton.setAttribute('aria-expanded','false'); };
+  const openPopover = (kind, button) => {
+    const alreadyOpen = !popover.hidden && popover.dataset.kind === kind;
+    closePopover(); if (alreadyOpen) return;
+    popover.dataset.kind = kind; popoverTitle.textContent = '场景快控';
+    popoverBody.innerHTML = '<div class="popover-item"><strong>大型游戏 · P10</strong><span class="popover-status good">生效中</span></div><div class="popover-item"><strong>插入交流电源 · P5</strong><span>待命</span></div><div class="popover-item"><strong>夜间静音 · P3</strong><span>未命中</span></div>';
+    popover.hidden = false; button.setAttribute('aria-expanded','true');
+  };
+  document.getElementById('brandToggle').addEventListener('click', () => sidebar.classList.toggle('collapsed'));
+  document.querySelectorAll('[data-theme]').forEach(button => button.addEventListener('click', () => {
+    root.dataset.theme = button.dataset.theme;
+    document.querySelectorAll('[data-theme]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+  }));
+  document.querySelectorAll('[data-density]').forEach(button => button.addEventListener('click', () => {
+    root.dataset.density = button.dataset.density;
+    document.querySelectorAll('[data-density]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+  }));
+  document.getElementById('accentPicker').addEventListener('input', event => {
+    const hex = event.target.value; const values = hex.match(/[0-9a-f]{2}/gi).map(value => parseInt(value, 16));
+    root.style.setProperty('--accent', hex); root.style.setProperty('--accent-rgb', values.join(' '));
+  });
+  sceneButton.addEventListener('click', event => { event.stopPropagation(); openPopover('scene', sceneButton); });
+  runtimeButton.addEventListener('click', () => document.getElementById('widget-runtime').scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  document.getElementById('popoverClose').addEventListener('click', closePopover);
+  document.addEventListener('click', event => { if (!popover.contains(event.target) && event.target !== sceneButton) closePopover(); });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') { closePopover(); closeModal(); } });
+
+  document.getElementById('editLayoutButton').addEventListener('click', () => setEditMode(!editMode));
+  document.getElementById('addWidgetButton').addEventListener('click', openModal);
+  function openModal() { modal.hidden = false; document.body.classList.add('modal-open'); switchTab('library'); refreshCatalog(); }
+  function closeModal() { modal.hidden = true; document.body.classList.remove('modal-open'); }
+  document.getElementById('closeComponentModal').addEventListener('click', closeModal);
+  modal.addEventListener('click', event => { if (event.target === modal) closeModal(); });
+  function switchTab(tab) {
+    document.querySelectorAll('[data-modal-tab]').forEach(button => { const active = button.dataset.modalTab === tab; button.classList.toggle('active', active); button.setAttribute('aria-selected', String(active)); });
+    libraryPanel.hidden = tab !== 'library'; customPanel.hidden = tab !== 'custom';
+    document.getElementById('componentModalTitle').textContent = tab === 'library' ? '添加组件' : '创建自定义组件';
+  }
+  document.querySelectorAll('[data-modal-tab]').forEach(button => button.addEventListener('click', () => switchTab(button.dataset.modalTab)));
+  document.querySelectorAll('[data-add-component]').forEach(button => button.addEventListener('click', () => { addBuiltin(button.dataset.addComponent); }));
+
+  grid.addEventListener('click', event => {
+    const button = event.target.closest('[data-widget-action]'); if (!button) return;
+    const widget = button.closest('.widget'); const action = button.dataset.widgetAction;
+    if (action === 'hide') { hiddenWidgets.add(widget.dataset.widgetId); widget.hidden = true; }
+    if (action === 'up' && widget.previousElementSibling) grid.insertBefore(widget, widget.previousElementSibling);
+    if (action === 'down' && widget.nextElementSibling) grid.insertBefore(widget.nextElementSibling, widget);
+    if (action === 'size') {
+      const sizes = [4,6,8,12]; const current = sizes.findIndex(n => widget.classList.contains('span-'+n));
+      widget.classList.remove(...sizes.map(n => 'span-'+n)); widget.classList.add('span-'+sizes[(current+1+sizes.length)%sizes.length]);
+    }
+    persistLayout(); refreshCatalog();
+  });
+
+  const filterButtons = [...document.querySelectorAll('[data-runtime-filter]')];
+  filterButtons.forEach(button => button.addEventListener('click', () => {
+    filterButtons.forEach(item => item.classList.toggle('active', item === button));
+    const filter = button.dataset.runtimeFilter;
+    document.querySelectorAll('.runtime-row').forEach(row => {
+      const show = filter === 'all' || (filter === 'attention' && row.dataset.attention === 'true') || (filter === 'state' && row.dataset.kind === 'state') || (filter === 'event' && row.dataset.kind === 'event');
+      row.hidden = !show;
+    });
+  }));
+  document.getElementById('viewAllRuntime').addEventListener('click', () => { alert('完整运行记录将在独立的「能力与诊断 → 运行日志」中查看。'); });
+
+  const customTitle = document.getElementById('customTitle');
+  const customSource = document.getElementById('customSource');
+  const customDisplay = document.getElementById('customDisplay');
+  const customValue = document.getElementById('customValue');
+  const customUnit = document.getElementById('customUnit');
+  const customDescription = document.getElementById('customDescription');
+  function updatePreview() {
+    const source = customSource.value;
+    const sourceDefaults = { 'cpu-temp': ['68.2','°C','CPU 核心温度'], 'gpu-temp': ['67.4','°C','GPU 核心温度'], memory: ['61.3','%','物理内存占用率'], 'process-count': ['186','个','当前运行进程'] };
+    const defaults = sourceDefaults[source] || [customValue.value || '72.5', customUnit.value || '°C', '自定义数值'];
+    const noteMode = customDisplay.value === 'note';
+    document.getElementById('customValueField').hidden = noteMode || source !== 'manual';
+    document.getElementById('customUnitField').hidden = noteMode || source !== 'manual';
+    document.getElementById('previewTitle').textContent = customTitle.value || '自定义组件';
+    document.getElementById('previewValue').innerHTML = noteMode ? '信息便笺' : defaults[0] + ' <i>' + defaults[1] + '</i>';
+    document.getElementById('previewDescription').textContent = customDescription.value || defaults[2];
+  }
+  [customTitle,customSource,customDisplay,customValue,customUnit,customDescription].forEach(el => el.addEventListener('input', updatePreview));
+  document.getElementById('customComponentForm').addEventListener('submit', event => {
+    event.preventDefault();
+    const source = customSource.value;
+    const defaults = { 'cpu-temp': ['68.2','°C','CPU 核心温度'], 'gpu-temp': ['67.4','°C','GPU 核心温度'], memory: ['61.3','%','物理内存占用率'], 'process-count': ['186','个','当前运行进程'] };
+    const base = defaults[source] || [customValue.value || '72.5',customUnit.value || '°C','自定义数值'];
+    const id = 'custom-' + Date.now().toString(36);
+    const config = { id, title: customTitle.value.trim(), desc: customDescription.value.trim() || base[2], source: source === 'manual' ? '用户自定义' : '自定义数据组件', display: customDisplay.value, value: base[0], unit: base[1], description: customDescription.value.trim() || base[2], span: 4 };
+    if (config.display === 'note') config.value = customDescription.value.trim() || config.title;
+    customWidgets.push(config); renderCustomWidget(config); addWidgetTools(grid.lastElementChild); persistLayout(); closeModal(); setEditMode(true); customTitle.value = ''; customValue.value = ''; customDescription.value = ''; updatePreview();
+  });
+  updatePreview(); refreshCatalog();
+})();
+</script>
+</body>
+</html>
