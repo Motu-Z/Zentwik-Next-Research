@@ -26,7 +26,13 @@ scripts/installer/zentwik-next.iss
 scripts/installer/ChineseSimplified.isl   Inno 官方语言目录不含简中，需随脚本带
 ```
 
-安装布局：`%ProgramFiles%\Zentwik`（平铺，不设 `Agent` 子目录），服务名 `ZentwikAgent`，数据目录 `%ProgramData%\ZentwikNext`。
+安装布局：`%ProgramFiles%\Zentwik`（平铺，不设 `Agent` 子目录），服务名 `ZentwikAgent`，数据目录 `%ProgramData%\Zentwik`，管道 `zentwik-agent`。
+
+对外标识（2026-11-27 用户决定，明确"我只是重构项目"）：`Product`、安装包名（`Zentwik-<version>-Setup.exe`）、安装/卸载显示名一律用 `Zentwik`，不再带 `next`；工作目录、Git 分支、研究仓库名仍叫 `next`，那是开发侧代号，不是产品名。
+
+- 控制台模式数据目录是 `%LOCALAPPDATA%\Zentwik`，**不能用 `%APPDATA%\Zentwik`**：那是旧版产品的配置目录（`tuning.json`、`masks.json`、`schedules.json`、`ui.json`、`Logs`），同名会互相覆盖。
+- 改名前的 `%ProgramData%\ZentwikNext` 由 `DataDirectoryMigration` 在首次 Run/Install 时合并搬迁：只补目标缺失的文件，已存在的（`owner.sid`、当天同名日志）保留；目标已有 `state.json` 视为活动目录，不再搬。旧目录保留不删，作为回退保险。
+- 搬迁必须早于任何 `StateStore` 创建：安装阶段会读状态文件写可选模块，先落下空 `state.json` 会让守卫把搬迁挡掉（踩过一次）。
 
 四条关键行为：
 
@@ -42,7 +48,7 @@ scripts/installer/ChineseSimplified.isl   Inno 官方语言目录不含简中，
 | 干净安装，不勾功耗墙 | 服务 RUNNING；`power-limits` 显示 `[可选·未启用]` |
 | 升级安装（服务在跑） | 文件覆盖成功、服务重启、`Installation process succeeded` |
 | 勾选功耗墙安装 | `power-limits` 变 `ready [可选·已启用]`，`powerlimit get` 读到 FAST 100 / SLOW 68 / STAPM 56 W |
-| 卸载 | 服务删除（`sc` 1060）、`%ProgramFiles%\Zentwik` 清空、`%ProgramData%\ZentwikNext` 保留 |
+| 卸载 | 服务删除（`sc` 1060）、`%ProgramFiles%\Zentwik` 清空、`%ProgramData%\Zentwik` 保留 |
 | 旧布局迁移 | 预置 `{app}\Agent\legacy.marker`，安装后该目录被 `[InstallDelete]` 清掉 |
 
 包体 2.3 MB（framework-dependent，要求 .NET 10 运行时；**未签名**，首次运行触发 SmartScreen）。
