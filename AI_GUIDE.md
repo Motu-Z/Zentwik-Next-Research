@@ -4,7 +4,7 @@
 
 > **开工前先读 [`project/AI_QUICKSTART.md`](project/AI_QUICKSTART.md)**：接手所需的最少事实（现状、命令、代码地图、七条高频错误）。
 > 再读 [`project/AI_WORK_RULES.md`](project/AI_WORK_RULES.md)：跨对话工作规范（事实源分工、老项目态度、性能门槛、验证分级、已发生错误清单）。
-> 明确不修的东西看 [`project/KNOWN_LIMITS.md`](project/KNOWN_LIMITS.md)。本文负责"怎么查资料"，那三份负责"怎么干活、什么别碰"。
+> 明确不修的东西看 [`project/KNOWN_LIMITS.md`](project/KNOWN_LIMITS.md)。涉及界面设计、视觉调整或 UI 评审时，另读 [`project/AI_UI_DESIGN_GUIDANCE.md`](project/AI_UI_DESIGN_GUIDANCE.md)。本文负责"怎么查资料"，那几份负责"怎么干活、什么别碰"。
 
 ## 1. 仓库职责地图
 
@@ -92,5 +92,5 @@
 - [ ] 我说明了每个范围属于哪一层，没有把软件钳制/典型值当固件限制吗？
 - [ ] 涉及外部事实时我**打开**了官方原文并定位到具体章节/行吗（不是只看搜索摘要）？
 - [ ] 涉及实测数据时我标注了来源七类与设备状态吗？没有原始日志的我没有写成"实测事实"吗？
-- [ ] 我区分了事实、推断和项目约定吗？
-- [ ] 遇到冲突我报告了吗，而不是自行补造？
+- [ ] 我区分了事实、推断与项目约定吗？
+- [ ] 遇到规范冲突我报告了吗，而不是自行补造？
