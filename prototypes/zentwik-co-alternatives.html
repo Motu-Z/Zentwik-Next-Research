@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Zentwik UI 原型 · CO 调校三种交互方案对比</title>
+<style>
+  :root {
+    --bg-window: #0d1015;
+    --bg-surface: #171c26;
+    --bg-surface-alt: #1e2430;
+    --bg-hover: #242b3a;
+    --border: #283042;
+    --border-strong: #3a465e;
+    --text-primary: #eef2f8;
+    --text-secondary: #9aa6bc;
+    --text-muted: #6c7890;
+    --accent: #3b82f6;
+    --accent-subtle: rgba(59, 130, 246, 0.16);
+    --accent-border: rgba(59, 130, 246, 0.55);
+    --good: #22c55e;
+    --good-subtle: rgba(34, 197, 94, 0.14);
+    --warn: #f59e0b;
+    --warn-subtle: rgba(245, 158, 11, 0.14);
+    --radius: 6px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg-window); color: var(--text-primary);
+    font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+    font-size: 13px; line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .top-switcher {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    padding: 10px 16px; background: #111620; border-bottom: 1px solid var(--border);
+  }
+  .badge {
+    background: var(--accent-subtle); color: #93c5fd; border: 1px solid var(--accent-border);
+    padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
+  }
+  .seg {
+    display: inline-flex; background: #1a202c; border: 1px solid var(--border-strong);
+    border-radius: 6px; padding: 3px; gap: 3px;
+  }
+  .seg button {
+    border: none; background: transparent; color: var(--text-secondary);
+    padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;
+  }
+  .seg button.active { background: var(--accent); color: #fff; font-weight: 600; }
+
+  .container { max-width: 1040px; margin: 0 auto; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+
+  .desc-card {
+    background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .sub { color: var(--text-secondary); font-size: 12px; }
+
+  .box {
+    background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+  }
+  .box-head {
+    padding: 10px 14px; background: var(--bg-surface-alt); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .box-body { padding: 14px; }
+
+  .btn {
+    height: 28px; padding: 0 10px; border-radius: var(--radius);
+    border: 1px solid var(--border-strong); background: var(--bg-surface-alt);
+    color: var(--text-primary); cursor: pointer; font-size: 12px;
+  }
+  .btn:hover { background: var(--bg-hover); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .btn-sm { height: 24px; padding: 0 8px; font-size: 11.5px; }
+
+  .pill {
+    display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 3px;
+    font-size: 11px; font-weight: 600;
+  }
+  .pill-good { background: var(--good-subtle); color: var(--good); }
+  .pill-warn { background: var(--warn-subtle); color: var(--warn); }
+  .pill-muted { background: var(--bg-surface-alt); color: var(--text-secondary); }
+
+  .stepper { display: inline-flex; align-items: center; gap: 6px; }
+  .stepper button {
+    width: 26px; height: 26px; border-radius: 4px; border: 1px solid var(--border-strong);
+    background: var(--bg-surface-alt); color: var(--text-primary); cursor: pointer; font-weight: 700;
+  }
+  .stepper button:hover { background: var(--bg-hover); }
+  .stepper .val { min-width: 40px; text-align: center; font-weight: 700; font-size: 14px; }
+
+  /* Core Grid Tiles (Clean, no per-cell button spam) */
+  .ccd-wrap { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 780px) { .ccd-wrap { grid-template-columns: 1fr; } }
+  .ccd-group {
+    background: var(--bg-surface-alt); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px;
+  }
+  .ccd-title {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 12px; font-weight: 600;
+  }
+  .tile-grid {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px;
+  }
+  .core-tile {
+    background: var(--bg-surface); border: 1px solid var(--border); border-radius: 5px;
+    padding: 8px 10px; cursor: pointer; transition: border-color .12s, background .12s;
+    display: flex; flex-direction: column; gap: 2px; user-select: none;
+  }
+  .core-tile:hover { background: var(--bg-hover); }
+  .core-tile.selected { border-color: var(--accent); background: var(--accent-subtle); }
+  .core-tile.dirty { border-color: var(--warn); }
+  .tile-top { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary); }
+  .tile-val { font-size: 16px; font-weight: 700; }
+  .tile-meta { font-size: 10.5px; color: var(--text-muted); }
+
+  /* Single Inspector Control Bar (Scheme 2) */
+  .edit-dock {
+    margin-top: 12px; padding: 12px 14px;
+    background: var(--bg-surface-alt); border: 1px solid var(--border-strong); border-radius: var(--radius);
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  }
+
+  /* Exceptions Table (Scheme 3) */
+  .ex-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  .ex-table th, .ex-table td {
+    padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; font-size: 12.5px;
+  }
+  .ex-table th { color: var(--text-muted); font-size: 11px; background: var(--bg-surface-alt); }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="top-switcher">
+  <div style="display:flex;align-items:center;gap:10px">
+    <span class="badge">CO 交互方案对比</span>
+    <strong>去掉“每行塞满按钮的表单感”，对比 3 种更干净的方案：</strong>
+  </div>
+  <div class="seg" id="schemeSeg">
+    <button class="active" onclick="showScheme(1, this)">方案 1：模式切换 (全核/CCD/逐核)</button>
+    <button onclick="showScheme(2, this)">方案 2：拓扑核图 + 底部统一编辑条</button>
+    <button onclick="showScheme(3, this)">方案 3：基线设置 + 例外核列表</button>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- SCHEME 1: Mode Switcher -->
+  <div id="scheme-1">
+    <div class="desc-card">
+      <div>
+        <strong>方案 1：三档粒度模式切换（全核统一 / 按 CCD / 逐核微调）</strong>
+        <div class="sub">思路：90% 时候用户只调全核或 CCD，没必要同时把三层编辑控件全摊在屏幕上；切到哪个粒度，就只看该粒度的控件。</div>
+      </div>
+      <div class="seg" id="s1ModeSeg">
+        <button class="active" onclick="setS1Mode('all', this)">全核统一</button>
+        <button onclick="setS1Mode('ccd', this)">按 CCD</button>
+        <button onclick="setS1Mode('core', this)">逐核微调</button>
+      </div>
+    </div>
+
+    <div class="box" style="margin-top:12px">
+      <div class="box-head">
+        <span style="font-weight:600" id="s1Title">当前粒度：全核统一偏移</span>
+        <span class="pill pill-good">16 核实测回读总览</span>
+      </div>
+      <div class="box-body">
+        <!-- Mode All -->
+        <div id="s1-all" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg-surface-alt);border-radius:6px;margin-bottom:12px">
+          <div>
+            <strong>所有核心 CO 偏移</strong>
+            <div class="sub">一键统一调整全部 8 个物理核</div>
+          </div>
+          <div class="stepper">
+            <button onclick="s1AdjAll(-5)">-</button>
+            <span class="val" id="s1AllVal">-20</span>
+            <button onclick="s1AdjAll(5)">+</button>
+          </div>
+        </div>
+
+        <!-- Mode CCD -->
+        <div id="s1-ccd" class="hidden" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--bg-surface-alt);border-radius:6px">
+            <div><strong>CCD 0 (Core 0–3)</strong><div class="sub">统一偏移</div></div>
+            <div class="stepper"><button onclick="s1AdjCcd(0,-5)">-</button><span class="val" id="s1Ccd0">-25</span><button onclick="s1AdjCcd(0,5)">+</button></div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--bg-surface-alt);border-radius:6px">
+            <div><strong>CCD 1 (Core 4–7)</strong><div class="sub">统一偏移</div></div>
+            <div class="stepper"><button onclick="s1AdjCcd(1,-5)">-</button><span class="val" id="s1Ccd1">-15</span><button onclick="s1AdjCcd(1,5)">+</button></div>
+          </div>
+        </div>
+
+        <!-- Mode Core hint -->
+        <div id="s1-core" class="hidden sub" style="margin-bottom:10px">
+          逐核模式下，直接点击下方任意核心方块即可微调或设为 Auto（其余核保持当前值）。
+        </div>
+
+        <!-- Clean Read-only / Clickable Tile Preview -->
+        <div class="ccd-wrap" id="s1Grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCHEME 2: Core Topology Matrix + Single Unified Editor Dock -->
+  <div id="scheme-2" class="hidden">
+    <div class="desc-card">
+      <div>
+        <strong>方案 2：干净的处理器核图 + 底部唯一编辑条（强烈推荐对比）</strong>
+        <div class="sub">思路：看状态与改参数分离。核图上没有任何重复按钮，支持单选 / 快捷全选 CCD0 / 快捷全选全部，下方用同一条控件统一调！</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm" onclick="s2Select('all')">全选所有核</button>
+        <button class="btn btn-sm" onclick="s2Select('ccd0')">仅选 CCD 0</button>
+        <button class="btn btn-sm" onclick="s2Select('ccd1')">仅选 CCD 1</button>
+      </div>
+    </div>
+
+    <div class="box" style="margin-top:12px">
+      <div class="box-head">
+        <span style="font-weight:600">处理器物理拓扑与实时 CO 状态（点击方块选中，可多选）</span>
+        <span class="sub">点击可切换选中，右上角标显示来源：全局 / CCD / 单核 / Auto</span>
+      </div>
+      <div class="box-body">
+        <div class="ccd-wrap" id="s2Grid"></div>
+
+        <!-- Single Unified Control Bar -->
+        <div class="edit-dock">
+          <div>
+            <strong id="s2SelLabel">已选中：CCD 0（Core 0, 1, 2, 3）</strong>
+            <div class="sub">在此统一调整选中核心的目标偏移，或设为 Auto / 恢复继承</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <div class="stepper">
+              <button onclick="s2Adj(-5)">-</button>
+              <span class="val" id="s2Val">-25</span>
+              <button onclick="s2Adj(5)">+</button>
+            </div>
+            <button class="btn" onclick="s2SetAuto()">设为 Auto (跳过)</button>
+            <button class="btn" onclick="s2Clear()">恢复继承</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCHEME 3: Baseline + Exceptions List -->
+  <div id="scheme-3" class="hidden">
+    <div class="desc-card">
+      <div>
+        <strong>方案 3：基线设置 + 例外核列表（贴合“只改少数例外核”场景）</strong>
+        <div class="sub">思路：上面只设「全局默认」和「CCD 默认」，下面只列出被单独覆盖或设为 Auto 的“例外核”，不把没改的核心全渲染成表单行。</div>
+      </div>
+    </div>
+
+    <div class="box" style="margin-top:12px">
+      <div class="box-head"><span style="font-weight:600">1. 基线层级（默认生效）</span></div>
+      <div class="box-body" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--bg-surface-alt);border-radius:6px">
+          <div><strong>全局默认</strong><div class="sub">DefaultOffset</div></div>
+          <div class="stepper"><button>-</button><span class="val">-15</span><button>+</button></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--bg-surface-alt);border-radius:6px">
+          <div><strong>CCD 0 覆盖</strong><div class="sub">Core 0–3</div></div>
+          <div class="stepper"><button>-</button><span class="val">-25</span><button>+</button></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--bg-surface-alt);border-radius:6px">
+          <div><strong>CCD 1 覆盖</strong><div class="sub">Core 4–7</div></div>
+          <span class="pill pill-muted">继承全局 (-15)</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="box" style="margin-top:12px">
+      <div class="box-head">
+        <span style="font-weight:600">2. 单核例外覆盖（仅显示偏离基线的核心）</span>
+        <button class="btn btn-primary btn-sm" onclick="alert('选择核心编号添加一条例外覆盖')">+ 添加例外核</button>
+      </div>
+      <div class="box-body">
+        <table class="ex-table">
+          <thead><tr><th>核心</th><th>所在 CCD</th><th>覆盖值 / 行为</th><th>硬件实测回读</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>Core 2</strong></td><td>CCD 0</td>
+              <td><div class="stepper"><button>-</button><span class="val">-30</span><button>+</button></div></td>
+              <td>-25 (待应用)</td>
+              <td><button class="btn btn-sm">移除例外</button></td>
+            </tr>
+            <tr>
+              <td><strong>Core 3</strong></td><td>CCD 0</td>
+              <td><span class="pill pill-muted">Auto（跳过写入）</span></td>
+              <td>0</td>
+              <td><button class="btn btn-sm">移除例外</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function showScheme(n, btn) {
+    document.querySelectorAll('#schemeSeg button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    [1,2,3].forEach(i => document.getElementById('scheme-' + i).classList.toggle('hidden', i !== n));
+  }
+
+  // Scheme 1 data
+  const s1 = { mode: 'all', all: -20, ccd0: -25, ccd1: -15, cores: [-20,-20,-20,-20,-20,-20,-20,-20] };
+  function setS1Mode(m, btn) {
+    s1.mode = m;
+    document.querySelectorAll('#s1ModeSeg button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('s1-all').classList.toggle('hidden', m !== 'all');
+    document.getElementById('s1-ccd').classList.toggle('hidden', m !== 'ccd');
+    document.getElementById('s1-core').classList.toggle('hidden', m !== 'core');
+    document.getElementById('s1Title').textContent = m === 'all' ? '当前粒度：全核统一偏移' : m === 'ccd' ? '当前粒度：按 CCD 分组偏移' : '当前粒度：逐核微调（点击核心方块调整）';
+    renderS1();
+  }
+  function s1AdjAll(d) { s1.all = Math.max(-50, Math.min(50, s1.all + d)); s1.cores = s1.cores.map(() => s1.all); document.getElementById('s1AllVal').textContent = s1.all; renderS1(); }
+  function s1AdjCcd(c, d) {
+    if (c === 0) { s1.ccd0 += d; document.getElementById('s1Ccd0').textContent = s1.ccd0; for(let i=0;i<4;i++) s1.cores[i]=s1.ccd0; }
+    else { s1.ccd1 += d; document.getElementById('s1Ccd1').textContent = s1.ccd1; for(let i=4;i<8;i++) s1.cores[i]=s1.ccd1; }
+    renderS1();
+  }
+  function renderS1() {
+    const g = document.getElementById('s1Grid'); g.innerHTML = '';
+    [0,1].forEach(ccd => {
+      const grp = document.createElement('div'); grp.className = 'ccd-group';
+      grp.innerHTML = `<div class="ccd-title"><span>CCD ${ccd}</span><span class="sub">Core ${ccd*4}–${ccd*4+3}</span></div><div class="tile-grid"></div>`;
+      const tg = grp.querySelector('.tile-grid');
+      for (let i = ccd*4; i < ccd*4+4; i++) {
+        const t = document.createElement('div'); t.className = 'core-tile';
+        t.innerHTML = `<div class="tile-top"><span>C${i}</span><span>回读 ${s1.cores[i]}</span></div><div class="tile-val">${s1.cores[i]}</div>`;
+        if (s1.mode === 'core') {
+          t.onclick = () => { s1.cores[i] = Math.max(-50, s1.cores[i] - 5); renderS1(); };
+          t.title = '点击减 5（演示）';
+        }
+        tg.appendChild(t);
+      }
+      g.appendChild(grp);
+    });
+  }
+
+  // Scheme 2 data
+  const s2 = {
+    selected: new Set([0,1,2,3]),
+    cores: [
+      { val: -25, src: 'CCD0', actual: -25 },
+      { val: -25, src: 'CCD0', actual: -25 },
+      { val: -30, src: '单核', actual: -25 },
+      { val: 'Auto', src: 'Auto', actual: 0 },
+      { val: -15, src: '全局', actual: -15 },
+      { val: -15, src: '全局', actual: -15 },
+      { val: -15, src: '全局', actual: -15 },
+      { val: -15, src: '全局', actual: -15 }
+    ]
+  };
+  function s2Select(mode) {
+    s2.selected.clear();
+    if (mode === 'all') [0,1,2,3,4,5,6,7].forEach(i => s2.selected.add(i));
+    if (mode === 'ccd0') [0,1,2,3].forEach(i => s2.selected.add(i));
+    if (mode === 'ccd1') [4,5,6,7].forEach(i => s2.selected.add(i));
+    renderS2();
+  }
+  function s2Adj(d) {
+    s2.selected.forEach(i => {
+      const cur = typeof s2.cores[i].val === 'number' ? s2.cores[i].val : -15;
+      s2.cores[i].val = Math.max(-50, Math.min(50, cur + d));
+      s2.cores[i].src = s2.selected.size === 1 ? '单核' : s2.selected.size === 4 ? 'CCD' : '批量';
+    });
+    renderS2();
+  }
+  function s2SetAuto() { s2.selected.forEach(i => { s2.cores[i].val = 'Auto'; s2.cores[i].src = 'Auto'; }); renderS2(); }
+  function s2Clear() { s2.selected.forEach(i => { s2.cores[i].val = -15; s2.cores[i].src = '全局'; }); renderS2(); }
+  function renderS2() {
+    const g = document.getElementById('s2Grid'); g.innerHTML = '';
+    [0,1].forEach(ccd => {
+      const grp = document.createElement('div'); grp.className = 'ccd-group';
+      grp.innerHTML = `<div class="ccd-title"><span>CCD ${ccd}</span><button class="btn btn-sm" onclick="s2Select('ccd${ccd}')">选中此 CCD</button></div><div class="tile-grid"></div>`;
+      const tg = grp.querySelector('.tile-grid');
+      for (let i = ccd*4; i < ccd*4+4; i++) {
+        const c = s2.cores[i];
+        const sel = s2.selected.has(i);
+        const dirty = typeof c.val === 'number' && c.val !== c.actual;
+        const t = document.createElement('div');
+        t.className = 'core-tile' + (sel ? ' selected' : '') + (dirty ? ' dirty' : '');
+        t.innerHTML = `<div class="tile-top"><span>C${i}</span><span>${c.src}</span></div><div class="tile-val">${c.val}</div><div class="tile-meta">回读: ${c.actual}</div>`;
+        t.onclick = (e) => {
+          if (e.ctrlKey || e.metaKey) { sel ? s2.selected.delete(i) : s2.selected.add(i); }
+          else { s2.selected.clear(); s2.selected.add(i); }
+          renderS2();
+        };
+        tg.appendChild(t);
+      }
+      g.appendChild(grp);
+    });
+    const arr = Array.from(s2.selected).sort((a,b)=>a-b);
+    document.getElementById('s2SelLabel').textContent = arr.length ? `已选中 ${arr.length} 个核心（C${arr.join(', C')}）` : '未选中任何核心（点击上方方块选中）';
+    const first = arr.length ? s2.cores[arr[0]].val : '—';
+    document.getElementById('s2Val').textContent = first;
+  }
+
+  renderS1();
+  renderS2();
+</script>
+</body>
+</html>

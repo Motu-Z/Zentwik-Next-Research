@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Zentwik UI 原型 · Round 4 CPU 调校域</title>
+<style>
+  :root {
+    --bg-window: #0d1015;
+    --bg-titlebar: #0a0c10;
+    --bg-rail: #12161e;
+    --bg-surface: #171c26;
+    --bg-surface-alt: #1e2430;
+    --bg-hover: #242b3a;
+    --border: #283042;
+    --border-strong: #37435a;
+    --text-primary: #eef2f8;
+    --text-secondary: #9aa6bc;
+    --text-muted: #6c7890;
+    --accent: #3b82f6;
+    --accent-subtle: rgba(59, 130, 246, 0.14);
+    --accent-border: rgba(59, 130, 246, 0.45);
+    --good: #22c55e;
+    --good-subtle: rgba(34, 197, 94, 0.14);
+    --warn: #f59e0b;
+    --warn-subtle: rgba(245, 158, 11, 0.14);
+    --bad: #ef4444;
+    --bad-subtle: rgba(239, 68, 68, 0.14);
+    --info: #38bdf8;
+    --info-subtle: rgba(56, 189, 248, 0.14);
+
+    --pad-panel: 16px;
+    --pad-cell: 9px 12px;
+    --gap: 12px;
+    --font-size: 13px;
+    --radius: 6px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #06080b;
+    color: var(--text-primary);
+    font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+    font-size: var(--font-size);
+    line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Prototype Switcher Bar */
+  .proto-note {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 14px; background: #111620; border-bottom: 1px solid #263042;
+    color: #cbd5e1; font-size: 12px; gap: 10px; flex-wrap: wrap;
+  }
+  .proto-badge {
+    background: rgba(59,130,246,0.18); color: #93c5fd;
+    border: 1px solid rgba(59,130,246,0.4);
+    padding: 2px 8px; border-radius: 999px; font-weight: 600; font-size: 11px;
+  }
+  .seg {
+    display: inline-flex; background: #1a202c; border: 1px solid #2d3748;
+    border-radius: 5px; padding: 2px; gap: 2px;
+  }
+  .seg button {
+    border: none; background: transparent; color: #94a3b8;
+    padding: 3px 9px; border-radius: 3px; cursor: pointer; font-size: 11.5px;
+  }
+  .seg button.active { background: var(--accent); color: #fff; font-weight: 600; }
+
+  .window-frame {
+    height: calc(100vh - 36px);
+    display: flex; flex-direction: column;
+    background: var(--bg-window);
+  }
+
+  /* Titlebar */
+  .titlebar {
+    height: 36px; min-height: 36px;
+    background: var(--bg-titlebar);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    padding-left: 12px;
+  }
+  .titlebar-left { display: flex; align-items: center; gap: 10px; }
+  .app-logo { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 12.5px; }
+  .dot-live { width: 7px; height: 7px; border-radius: 50%; background: var(--good); }
+  .sys-chip {
+    font-size: 11px; color: var(--text-secondary);
+    padding: 1px 7px; border-radius: 4px;
+    background: var(--bg-surface); border: 1px solid var(--border);
+  }
+  .titlebar-right { display: flex; align-items: center; height: 100%; }
+  .quick-icons { display: flex; height: 100%; border-right: 1px solid var(--border); }
+  .tb-icon-btn, .cap-btn {
+    width: 40px; height: 100%; border: none; background: transparent;
+    color: var(--text-secondary); cursor: pointer;
+    display: flex; align-items: center; justify-content: center; position: relative;
+  }
+  .cap-btn { width: 44px; }
+  .tb-icon-btn:hover, .cap-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .cap-btn.close:hover { background: #dc2626; color: #fff; }
+  .tb-icon-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.7; }
+  .cap-btn svg { width: 11px; height: 11px; stroke: currentColor; fill: none; stroke-width: 1.5; }
+
+  .workspace-body { flex: 1; min-height: 0; display: flex; }
+
+  /* C1 Rail */
+  .nav-rail {
+    width: 184px; min-width: 184px;
+    background: var(--bg-rail); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; justify-content: space-between; padding: 8px;
+  }
+  .nav-group-label {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.6px;
+    color: var(--text-muted); padding: 8px 8px 4px;
+  }
+  .nav-item {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%; border: none; background: transparent;
+    color: var(--text-secondary); padding: 7px 10px;
+    border-radius: var(--radius); cursor: pointer; text-align: left;
+    font-size: var(--font-size); margin-bottom: 2px;
+  }
+  .nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .nav-item.active {
+    background: var(--accent-subtle); color: var(--text-primary);
+    font-weight: 600; box-shadow: inset 2px 0 0 var(--accent);
+  }
+  .nav-tag { font-size: 10.5px; padding: 1px 5px; border-radius: 3px; background: var(--bg-surface-alt); color: var(--text-secondary); }
+  .nav-tag.warn { background: var(--warn-subtle); color: var(--warn); }
+
+  /* Main Pane */
+  .main-pane {
+    flex: 1; min-width: 0; overflow-y: auto;
+    padding: var(--pad-panel);
+    display: flex; flex-direction: column; gap: var(--gap);
+  }
+
+  /* Live-First Preset & Apply Strip */
+  .preset-strip {
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+    gap: 10px; padding: var(--pad-cell);
+    background: var(--bg-surface); border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .preset-strip.dirty {
+    border-color: var(--warn);
+    background: linear-gradient(90deg, var(--warn-subtle) 0%, var(--bg-surface) 38%);
+  }
+  .preset-left, .preset-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+  select.flat-select {
+    height: 28px; padding: 0 8px; border-radius: var(--radius);
+    background: var(--bg-surface-alt); border: 1px solid var(--border-strong);
+    color: var(--text-primary); font-size: 12px;
+  }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+    height: 28px; padding: 0 10px; border-radius: var(--radius);
+    border: 1px solid var(--border-strong); background: var(--bg-surface);
+    color: var(--text-primary); cursor: pointer; font-size: 12px; white-space: nowrap;
+  }
+  .btn:hover { background: var(--bg-hover); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .btn-primary:hover { filter: brightness(1.08); background: var(--accent); }
+  .btn-sm { height: 22px; padding: 0 7px; font-size: 11px; }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 7px; border-radius: 3px; font-size: 11px; font-weight: 600;
+  }
+  .pill-good { background: var(--good-subtle); color: var(--good); }
+  .pill-warn { background: var(--warn-subtle); color: var(--warn); }
+  .pill-bad { background: var(--bad-subtle); color: var(--bad); }
+  .pill-info { background: var(--info-subtle); color: var(--info); }
+  .pill-muted { background: var(--bg-surface-alt); color: var(--text-secondary); }
+
+  /* Section Box */
+  .section-box {
+    background: var(--bg-surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden;
+  }
+  .section-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: var(--pad-cell); border-bottom: 1px solid var(--border);
+    background: var(--bg-surface-alt); gap: 8px;
+  }
+  .section-title { font-weight: 600; }
+  .section-sub { color: var(--text-secondary); font-size: 11.5px; }
+
+  /* Top Summary Controls (Global Default + FMax) */
+  .amd-top-bar {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-bottom: 1px solid var(--border);
+  }
+  @media (max-width: 960px) { .amd-top-bar { grid-template-columns: 1fr; } }
+  .top-ctrl {
+    padding: 10px 14px; border-right: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .top-ctrl:last-child { border-right: none; }
+
+  .stepper { display: inline-flex; align-items: center; gap: 4px; }
+  .stepper button {
+    width: 24px; height: 24px; border-radius: 4px;
+    border: 1px solid var(--border-strong); background: var(--bg-surface-alt);
+    color: var(--text-primary); cursor: pointer; font-weight: 700;
+  }
+  .stepper button:hover { background: var(--bg-hover); }
+  .stepper .val { min-width: 42px; text-align: center; font-weight: 700; }
+
+  /* CCD Topology Cards */
+  .ccd-grid {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap);
+    padding: var(--pad-panel);
+  }
+  @media (max-width: 960px) { .ccd-grid { grid-template-columns: 1fr; } }
+  .ccd-panel {
+    background: var(--bg-surface-alt); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden;
+  }
+  .ccd-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 12px; border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,0.02);
+  }
+  .core-table { width: 100%; border-collapse: collapse; }
+  .core-table th, .core-table td {
+    padding: 6px 10px; border-bottom: 1px solid var(--border);
+    text-align: left; font-size: 12px;
+  }
+  .core-table tr:last-child td { border-bottom: none; }
+  .core-table th { color: var(--text-muted); font-weight: 600; font-size: 11px; }
+  .core-table tr.changed td { background: rgba(245, 158, 11, 0.05); }
+
+  /* Intel Layout */
+  .intel-grid {
+    display: grid; grid-template-columns: 1.1fr 1fr; gap: var(--gap);
+  }
+  @media (max-width: 960px) { .intel-grid { grid-template-columns: 1fr; } }
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th, .data-table td {
+    padding: var(--pad-cell); border-bottom: 1px solid var(--border); text-align: left;
+  }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table th { color: var(--text-muted); font-size: 11px; font-weight: 600; background: var(--bg-surface-alt); }
+
+  /* Notice / Safety Strip */
+  .banner {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+    padding: 10px 14px; border-radius: var(--radius);
+    border: 1px solid var(--border); background: var(--bg-surface);
+  }
+  .banner.warn { border-color: rgba(245,158,11,0.45); background: var(--warn-subtle); }
+  .banner.bad { border-color: rgba(239,68,68,0.45); background: var(--bad-subtle); }
+
+  /* Degraded Empty State */
+  .degraded-box {
+    padding: 28px 24px; text-align: left;
+    background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
+    display: flex; flex-direction: column; gap: 10px; max-width: 680px;
+  }
+
+  /* Future Extension Placeholder */
+  .ext-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 9px 12px; border: 1px dashed var(--border-strong);
+    border-radius: var(--radius); color: var(--text-secondary); font-size: 12px;
+  }
+
+  .hidden { display: none !important; }
+  .toast {
+    position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+    background: #1e293b; color: #f8fafc; border: 1px solid var(--accent);
+    padding: 7px 14px; border-radius: 6px; font-size: 12px; z-index: 50;
+  }
+</style>
+</head>
+<body>
+
+<div class="proto-note">
+  <div><span class="proto-badge">Round 4 原型</span> <strong>CPU 调校域结构设计（Live-First 直改 + 方案预设条）</strong></div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <span>模拟硬件平台：</span>
+    <div class="seg" id="platformSeg">
+      <button class="active" onclick="setPlatform('amd', this)">AMD Ryzen (分层 CO + FMax)</button>
+      <button onclick="setPlatform('intel', this)">Intel Core (三平面电压 + 8档倍频)</button>
+      <button onclick="setPlatform('unavailable', this)">PawnIO 缺失 / 降级态</button>
+    </div>
+  </div>
+</div>
+
+<div class="window-frame">
+  <header class="titlebar">
+    <div class="titlebar-left">
+      <div class="app-logo"><span class="dot-live"></span>Zentwik</div>
+      <span class="sys-chip" id="hdrChip">Ryzen 9 9955HX · 16C/32T · AC 供电</span>
+    </div>
+    <div class="titlebar-right">
+      <div class="quick-icons">
+        <button class="tb-icon-btn" title="场景与自动化" onclick="toast('场景快控 Flyout')"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></button>
+        <button class="tb-icon-btn" title="状态账本" onclick="toast('账本快览 Flyout')"><svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg></button>
+        <button class="tb-icon-btn" title="外观与密度" onclick="toast('外观与密度 Flyout')"><svg viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/></svg></button>
+      </div>
+      <div class="caption-btns">
+        <button class="cap-btn"><svg viewBox="0 0 12 12"><line x1="1" y1="6" x2="11" y2="6"/></svg></button>
+        <button class="cap-btn"><svg viewBox="0 0 12 12"><rect x="1.5" y="1.5" width="9" height="9"/></svg></button>
+        <button class="cap-btn close"><svg viewBox="0 0 12 12"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg></button>
+      </div>
+    </div>
+  </header>
+
+  <div class="workspace-body">
+    <aside class="nav-rail">
+      <div>
+        <div class="nav-group-label">实时控制与监控</div>
+        <button class="nav-item" onclick="toast('返回首页总览')"><span>首页总览</span></button>
+        <button class="nav-item active"><span>CPU 调校</span><span class="nav-tag warn" id="navTag">待应用</span></button>
+        <button class="nav-item" onclick="toast('进入电源管理')"><span>电源管理</span></button>
+        <button class="nav-item" onclick="toast('进入进程与调度')"><span>进程与调度</span></button>
+        <div class="nav-group-label">编排与预设</div>
+        <button class="nav-item"><span>场景自动化</span></button>
+        <button class="nav-item"><span>方案库</span></button>
+      </div>
+      <div>
+        <div class="nav-group-label">系统</div>
+        <button class="nav-item"><span>能力与诊断</span></button>
+        <button class="nav-item"><span>系统设置</span></button>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-pane">
+
+      <!-- VIEW 1: AMD -->
+      <div id="view-amd">
+        <div class="preset-strip dirty" id="amdStrip">
+          <div class="preset-left">
+            <span class="pill pill-good">AMD SMU · 固件持久</span>
+            <span class="section-sub">参考方案：</span>
+            <select class="flat-select">
+              <option>游戏负压 (Default -15 / CCD0 -25)</option>
+              <option>出厂基线 (0 / Auto)</option>
+              <option>静音低温 (-15 / FMax 5050)</option>
+            </select>
+            <span class="pill pill-warn" id="amdDirtyPill">已修改 2 项（未应用）</span>
+          </div>
+          <div class="preset-right">
+            <button class="btn" onclick="resetAmd()">还原</button>
+            <button class="btn" onclick="toast('弹出保存框：另存为新 CpuTuningPlan 或覆盖当前方案')">另存为方案…</button>
+            <button class="btn btn-primary" onclick="applyAmd()">应用并回读</button>
+          </div>
+        </div>
+
+        <div class="section-box" style="margin-top:var(--gap)">
+          <div class="section-head">
+            <div>
+              <div class="section-title">Curve Optimizer 分层控制 &amp; FMax 上限</div>
+              <div class="section-sub">优先级规则：单核覆盖 / Auto &gt; CCD 默认 &gt; 全局默认 · 不对称偏移已标注</div>
+            </div>
+            <span class="pill pill-info">BootGuard 正常 · 休眠恢复已开启</span>
+          </div>
+
+          <!-- Level 1 (Global Default) + FMax + Baseline Restore -->
+          <div class="amd-top-bar">
+            <div class="top-ctrl">
+              <div>
+                <div style="font-weight:600">L1 · 全局默认 CO</div>
+                <div class="section-sub">未单独覆盖的核心继承此值</div>
+              </div>
+              <div class="stepper">
+                <button onclick="adjGlobal(-5)">-</button>
+                <span class="val" id="amdGlobal">-15</span>
+                <button onclick="adjGlobal(5)">+</button>
+              </div>
+            </div>
+
+            <div class="top-ctrl">
+              <div>
+                <div style="font-weight:600">FMax 频率上限</div>
+                <div class="section-sub">实测回读：<strong id="amdFmaxActual">5450 MHz</strong> · 基线 5700</div>
+              </div>
+              <div class="stepper">
+                <button onclick="adjFmax(-25)">-</button>
+                <span class="val" id="amdFmax">5450</span>
+                <button onclick="adjFmax(25)">+</button>
+              </div>
+            </div>
+
+            <div class="top-ctrl">
+              <div>
+                <div style="font-weight:600">安全恢复与基线</div>
+                <div class="section-sub">基线来源：SMU 启动前采集</div>
+              </div>
+              <button class="btn" onclick="toast('回退全部 CO=0 与 FMax=5700 MHz')">恢复出厂安全值</button>
+            </div>
+          </div>
+
+          <!-- Level 2 (CCD) + Level 3 (Per-Core) -->
+          <div class="ccd-grid">
+            <div class="ccd-panel">
+              <div class="ccd-header">
+                <div>
+                  <strong>CCD 0 · 物理核 0–3</strong>
+                  <span class="section-sub" style="margin-left:6px">L3 缓存域 #0</span>
+                </div>
+                <div class="stepper">
+                  <span class="section-sub" style="margin-right:4px">CCD 默认:</span>
+                  <button onclick="adjCcd(0, -5)">-</button>
+                  <span class="val" id="ccd0Val">-25</span>
+                  <button onclick="adjCcd(0, 5)">+</button>
+                </div>
+              </div>
+              <table class="core-table">
+                <thead><tr><th>核心</th><th>编辑目标</th><th>硬件回读</th><th>有效来源 / 状态</th></tr></thead>
+                <tbody id="amdCcd0Body"></tbody>
+              </table>
+            </div>
+
+            <div class="ccd-panel">
+              <div class="ccd-header">
+                <div>
+                  <strong>CCD 1 · 物理核 4–7</strong>
+                  <span class="section-sub" style="margin-left:6px">L3 缓存域 #1</span>
+                </div>
+                <div class="stepper">
+                  <span class="section-sub" style="margin-right:4px">CCD 默认:</span>
+                  <button onclick="adjCcd(1, -5)">-</button>
+                  <span class="val" id="ccd1Val">继承</span>
+                  <button onclick="adjCcd(1, 5)">+</button>
+                </div>
+              </div>
+              <table class="core-table">
+                <thead><tr><th>核心</th><th>编辑目标</th><th>硬件回读</th><th>有效来源 / 状态</th></tr></thead>
+                <tbody id="amdCcd1Body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="ext-row" style="margin-top:var(--gap)">
+          <span><strong>[未来扩展位] 平台功耗限制（STAPM / PPT / TDC / EDC）</strong> — 仅在对应 APU / 桌面平台确认硬件链路后按能力显隐展开，不强行与其他参数混排</span>
+          <span class="pill pill-muted">未启用</span>
+        </div>
+      </div>
+
+      <!-- VIEW 2: INTEL -->
+      <div id="view-intel" class="hidden">
+        <div class="preset-strip">
+          <div class="preset-left">
+            <span class="pill pill-warn">Intel MSR · 仅当前会话有效 (重启失效)</span>
+            <span class="section-sub">参考方案：</span>
+            <select class="flat-select">
+              <option>日常降压 (-45 mV Core/Cache)</option>
+              <option>本次启动基线 (0 mV)</option>
+            </select>
+          </div>
+          <div class="preset-right">
+            <button class="btn" onclick="toast('恢复本次启动原始基线')">恢复启动基线</button>
+            <button class="btn" onclick="toast('另存为 CpuTuningPlan（标记会话级持久）')">另存为方案…</button>
+            <button class="btn btn-primary" onclick="toast('写入 MSR 0x150 / 0x1AD 并回读校验')">应用并回读</button>
+          </div>
+        </div>
+
+        <div class="banner warn" style="margin-top:var(--gap)">
+          <div>
+            <strong>注意假阳性与会话持久边界：</strong>
+            <span class="section-sub">若 BIOS 开启了 Undervolt Protection (UVP) 或 Overclocking Lock，MSR 回读可能显示与写入一致但实际电压未下降，请结合首页负载下的温度/功耗变化判断。重启后需重新应用或由自动化触发。</span>
+          </div>
+          <span class="pill pill-warn">UVP 风险提示</span>
+        </div>
+
+        <div class="intel-grid" style="margin-top:var(--gap)">
+          <!-- 3-Plane Voltage Offset -->
+          <div class="section-box">
+            <div class="section-head">
+              <div>
+                <div class="section-title">电压平面偏移 (MSR 0x150 OC Mailbox)</div>
+                <div class="section-sub">11 位 1/1024 V 编码 · 回读容差 ±2 mV</div>
+              </div>
+            </div>
+            <table class="data-table">
+              <thead><tr><th>电压平面</th><th>目标偏移 (mV)</th><th>硬件回读</th><th>状态</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><strong>Core (IA 域)</strong></td>
+                  <td><div class="stepper"><button onclick="toast('Core -5mV')">-</button><span class="val">-45</span><button onclick="toast('Core +5mV')">+</button></div></td>
+                  <td>-45 mV</td>
+                  <td><span class="pill pill-good">一致</span></td>
+                </tr>
+                <tr>
+                  <td><strong>Cache (Ring 域)</strong></td>
+                  <td><div class="stepper"><button>-</button><span class="val">-45</span><button>+</button></div></td>
+                  <td>-45 mV</td>
+                  <td><span class="pill pill-good">一致</span></td>
+                </tr>
+                <tr>
+                  <td><strong>GPU (GT 域)</strong></td>
+                  <td><div class="stepper"><button>-</button><span class="val">0</span><button>+</button></div></td>
+                  <td>0 mV</td>
+                  <td><span class="pill pill-muted">未修改</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 8-Bin Turbo Ratio Limit -->
+          <div class="section-box">
+            <div class="section-head">
+              <div>
+                <div class="section-title">睿频倍频上限 (MSR 0x1AD · 8 档)</div>
+                <div class="section-sub">一次性写入后逐档比对回读</div>
+              </div>
+            </div>
+            <table class="data-table">
+              <thead><tr><th>活跃核数</th><th>目标倍频</th><th>当前回读</th></tr></thead>
+              <tbody>
+                <tr><td>1–2 Core</td><td><div class="stepper"><button>-</button><span class="val">54x</span><button>+</button></div></td><td>54x (5.4 GHz)</td></tr>
+                <tr><td>3–4 Core</td><td><div class="stepper"><button>-</button><span class="val">52x</span><button>+</button></div></td><td>52x (5.2 GHz)</td></tr>
+                <tr><td>5–6 Core</td><td><div class="stepper"><button>-</button><span class="val">50x</span><button>+</button></div></td><td>50x (5.0 GHz)</td></tr>
+                <tr><td>7–8 Core</td><td><div class="stepper"><button>-</button><span class="val">49x</span><button>+</button></div></td><td>49x (4.9 GHz)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 3: DEGRADED / UNAVAILABLE -->
+      <div id="view-unavailable" class="hidden">
+        <div class="degraded-box">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="pill pill-bad">DriverUnavailable</span>
+            <strong>CPU 底层调校通道不可用（未检测到 PawnIO 驱动）</strong>
+          </div>
+          <div class="section-sub" style="line-height:1.6">
+            Zentwik 未在系统中检测到运行中的 PawnIO 驱动，或当前驱动访问被安全/反作弊软件拦截。
+            <strong>这不会影响其他功能：</strong>电源管理、进程调度（CPU Sets / 优先级）和只读监控仍可正常使用。
+          </div>
+          <div style="display:flex;gap:8px;margin-top:4px">
+            <button class="btn btn-primary" onclick="toast('打开 PawnIO 官方安装引导')">安装 / 修复 PawnIO 驱动</button>
+            <button class="btn" onclick="toast('重新探测硬件通道')">重新探测</button>
+            <button class="btn" onclick="toast('跳转到能力与诊断详情')">查看诊断详情</button>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<div class="toast hidden" id="toastEl"></div>
+
+<script>
+  const amd = {
+    global: -15,
+    ccd0: -25,
+    ccd1: null, // null = inherit global
+    fmax: 5450,
+    actualFmax: 5450,
+    cores: [
+      { id: 0, override: null, auto: false, actual: -25 },
+      { id: 1, override: null, auto: false, actual: -25 },
+      { id: 2, override: -30,  auto: false, actual: -25 }, // intentionally pending
+      { id: 3, override: null, auto: true,  actual: 0   },
+      { id: 4, override: null, auto: false, actual: -15 },
+      { id: 5, override: null, auto: false, actual: -15 },
+      { id: 6, override: null, auto: false, actual: -15 },
+      { id: 7, override: null, auto: false, actual: -15 }
+    ]
+  };
+
+  function resolveCore(c) {
+    if (c.auto) return { val: 'auto', src: 'Auto 跳过', dirty: false };
+    if (c.override !== null) return { val: c.override, src: '单核覆盖', dirty: c.override !== c.actual };
+    const ccdVal = c.id < 4 ? amd.ccd0 : amd.ccd1;
+    if (ccdVal !== null) return { val: ccdVal, src: `CCD${c.id < 4 ? 0 : 1} 继承`, dirty: ccdVal !== c.actual };
+    return { val: amd.global, src: '全局继承', dirty: amd.global !== c.actual };
+  }
+
+  function renderAmd() {
+    document.getElementById('amdGlobal').textContent = amd.global;
+    document.getElementById('ccd0Val').textContent = amd.ccd0 === null ? '继承' : amd.ccd0;
+    document.getElementById('ccd1Val').textContent = amd.ccd1 === null ? '继承' : amd.ccd1;
+    document.getElementById('amdFmax').textContent = amd.fmax;
+    document.getElementById('amdFmaxActual').textContent = `${amd.actualFmax} MHz`;
+
+    const b0 = document.getElementById('amdCcd0Body');
+    const b1 = document.getElementById('amdCcd1Body');
+    b0.innerHTML = ''; b1.innerHTML = '';
+
+    let dirtyCount = amd.fmax !== amd.actualFmax ? 1 : 0;
+
+    amd.cores.forEach(c => {
+      const r = resolveCore(c);
+      if (r.dirty) dirtyCount++;
+      const tr = document.createElement('tr');
+      if (r.dirty) tr.className = 'changed';
+      tr.innerHTML = `
+        <td><strong>Core ${c.id}</strong></td>
+        <td>
+          <div class="stepper">
+            <button onclick="adjCore(${c.id}, -5)">-</button>
+            <span class="val" style="color:${r.dirty ? 'var(--warn)' : 'var(--text-primary)'}">${r.val}</span>
+            <button onclick="adjCore(${c.id}, 5)">+</button>
+            <button class="btn btn-sm" onclick="toggleAuto(${c.id})">${c.auto ? '取消Auto' : 'Auto'}</button>
+            ${c.override !== null ? `<button class="btn btn-sm" onclick="clearOverride(${c.id})">继承</button>` : ''}
+          </div>
+        </td>
+        <td>${c.actual}</td>
+        <td><span class="pill ${c.auto ? 'pill-muted' : r.dirty ? 'pill-warn' : 'pill-good'}">${r.dirty ? r.src + ' · 待应用' : r.src}</span></td>
+      `;
+      (c.id < 4 ? b0 : b1).appendChild(tr);
+    });
+
+    const strip = document.getElementById('amdStrip');
+    const pill = document.getElementById('amdDirtyPill');
+    const navTag = document.getElementById('navTag');
+    if (dirtyCount > 0) {
+      strip.classList.add('dirty');
+      pill.textContent = `已修改 ${dirtyCount} 项（未应用）`;
+      pill.className = 'pill pill-warn';
+      navTag.textContent = '待应用';
+      navTag.className = 'nav-tag warn';
+    } else {
+      strip.classList.remove('dirty');
+      pill.textContent = '硬件实际值已对齐';
+      pill.className = 'pill pill-good';
+      navTag.textContent = 'AMD';
+      navTag.className = 'nav-tag';
+    }
+  }
+
+  window.adjGlobal = d => { amd.global = Math.max(-50, Math.min(50, amd.global + d)); renderAmd(); };
+  window.adjCcd = (idx, d) => {
+    const key = idx === 0 ? 'ccd0' : 'ccd1';
+    const cur = amd[key] === null ? amd.global : amd[key];
+    amd[key] = Math.max(-50, Math.min(50, cur + d));
+    renderAmd();
+  };
+  window.adjFmax = d => { amd.fmax = Math.max(4450, Math.min(5750, amd.fmax + d)); renderAmd(); };
+  window.adjCore = (id, d) => {
+    const c = amd.cores[id];
+    c.auto = false;
+    const base = c.override !== null ? c.override : (id < 4 ? (amd.ccd0 ?? amd.global) : (amd.ccd1 ?? amd.global));
+    c.override = Math.max(-50, Math.min(50, base + d));
+    renderAmd();
+  };
+  window.toggleAuto = id => { amd.cores[id].auto = !amd.cores[id].auto; renderAmd(); };
+  window.clearOverride = id => { amd.cores[id].override = null; renderAmd(); };
+
+  window.applyAmd = () => {
+    amd.cores.forEach(c => {
+      const r = resolveCore(c);
+      if (r.val !== 'auto') c.actual = r.val;
+    });
+    amd.actualFmax = amd.fmax;
+    renderAmd();
+    toast('已写入 SMU 并完成逐核回读校验，可随时「另存为方案」');
+  };
+
+  window.resetAmd = () => {
+    amd.global = -15; amd.ccd0 = -25; amd.ccd1 = null; amd.fmax = 5450; amd.actualFmax = 5450;
+    amd.cores.forEach(c => { c.override = null; c.auto = false; c.actual = c.id < 4 ? -25 : -15; });
+    renderAmd();
+    toast('已还原为参考方案「游戏负压」');
+  };
+
+  function setPlatform(p, btn) {
+    document.querySelectorAll('#platformSeg button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    ['amd', 'intel', 'unavailable'].forEach(v => {
+      document.getElementById('view-' + v).classList.toggle('hidden', v !== p);
+    });
+    document.getElementById('hdrChip').textContent =
+      p === 'amd' ? 'Ryzen 9 9955HX · 16C/32T · AC 供电' :
+      p === 'intel' ? 'Core i9-14900K · 24C/32T · AC 供电' :
+      'Ryzen 9 9955HX · PawnIO 未就绪';
+  }
+
+  function toast(msg) {
+    const el = document.getElementById('toastEl');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    clearTimeout(window._t);
+    window._t = setTimeout(() => el.classList.add('hidden'), 2400);
+  }
+
+  renderAmd();
+</script>
+</body>
+</html>

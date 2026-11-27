@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Zentwik UI 原型 · 互斥模式与 24 核拓扑扩展</title>
+<style>
+  :root {
+    --bg-window: #0d1015;
+    --bg-surface: #171c26;
+    --bg-surface-alt: #1e2430;
+    --bg-hover: #252d3d;
+    --border: #283042;
+    --border-strong: #3a465e;
+    --text-primary: #eef2f8;
+    --text-secondary: #9aa6bc;
+    --text-muted: #6c7890;
+    --accent: #3b82f6;
+    --accent-subtle: rgba(59, 130, 246, 0.16);
+    --accent-border: rgba(59, 130, 246, 0.55);
+    --good: #22c55e;
+    --good-subtle: rgba(34, 197, 94, 0.14);
+    --warn: #f59e0b;
+    --warn-subtle: rgba(245, 158, 11, 0.14);
+    --radius: 6px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg-window); color: var(--text-primary);
+    font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+    font-size: 13px; line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .proto-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    padding: 8px 16px; background: #111620; border-bottom: 1px solid var(--border);
+  }
+  .badge {
+    background: var(--accent-subtle); color: #93c5fd; border: 1px solid var(--accent-border);
+    padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
+  }
+  .seg {
+    display: inline-flex; background: #131822; border: 1px solid var(--border-strong);
+    border-radius: 5px; padding: 2px; gap: 2px;
+  }
+  .seg button {
+    border: none; background: transparent; color: var(--text-secondary);
+    padding: 4px 10px; border-radius: 3px; cursor: pointer; font-size: 11.5px;
+  }
+  .seg button.active { background: var(--accent); color: #fff; font-weight: 600; }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .sub { color: var(--text-secondary); font-size: 11.5px; }
+
+  .preset-strip {
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+    padding: 10px 14px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
+  }
+  .btn {
+    height: 28px; padding: 0 10px; border-radius: var(--radius);
+    border: 1px solid var(--border-strong); background: var(--bg-surface-alt);
+    color: var(--text-primary); cursor: pointer; font-size: 12px;
+  }
+  .btn:hover { background: var(--bg-hover); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .btn-sm { height: 22px; padding: 0 7px; font-size: 11px; }
+
+  .pill {
+    display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 3px;
+    font-size: 11px; font-weight: 600;
+  }
+  .pill-good { background: var(--good-subtle); color: var(--good); }
+  .pill-warn { background: var(--warn-subtle); color: var(--warn); }
+  .pill-muted { background: var(--bg-surface-alt); color: var(--text-secondary); }
+
+  select.flat-select {
+    height: 28px; padding: 0 8px; border-radius: var(--radius);
+    background: var(--bg-surface-alt); border: 1px solid var(--border-strong);
+    color: var(--text-primary); font-size: 12px;
+  }
+
+  .box {
+    background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+  }
+  .box-head {
+    padding: 9px 14px; background: var(--bg-surface-alt); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  }
+  .box-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
+
+  /* Compact Heatmap/Summary Strip for 24 cores in All-Core / Per-CCD mode */
+  .mini-strip-grid {
+    display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4px;
+  }
+  @media (max-width: 780px) { .mini-strip-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+  .mini-chip {
+    background: var(--bg-surface-alt); border: 1px solid var(--border); border-radius: 4px;
+    padding: 4px 2px; text-align: center; font-size: 11px;
+  }
+  .mini-chip .c { color: var(--text-muted); font-size: 10px; display: block; }
+  .mini-chip .v { font-weight: 700; }
+
+  /* Collapsible CCD / Cluster Accordion for 24-Core Per-Core Mode */
+  .cluster-card {
+    background: var(--bg-surface-alt); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+  }
+  .cluster-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 8px 12px; cursor: pointer; user-select: none;
+  }
+  .cluster-head:hover { background: var(--bg-hover); }
+  .cluster-body { padding: 10px 12px; border-top: 1px solid var(--border); }
+
+  /* Ultra-compact 6-column or 4-column core cells for 12-core CCDs */
+  .core-grid-dense {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px;
+  }
+  @media (max-width: 680px) { .core-grid-dense { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .dense-cell {
+    background: var(--bg-surface); border: 1px solid var(--border); border-radius: 4px;
+    padding: 6px 8px; display: flex; flex-direction: column; gap: 4px;
+  }
+  .bar-track {
+    position: relative; height: 6px; background: #10141c;
+    border: 1px solid var(--border); border-radius: 2px; cursor: ew-resize;
+  }
+  .bar-zero { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--border-strong); }
+  .bar-fill { position: absolute; top: 0; bottom: 0; border-radius: 2px; background: var(--accent); }
+  .num-input {
+    width: 44px; height: 22px; text-align: center; background: var(--bg-surface-alt);
+    border: 1px solid var(--border); border-radius: 3px; color: var(--text-primary); font-weight: 700; font-size: 12px;
+  }
+
+  /* Curve Shaper 2D Matrix */
+  .cs-table { width: 100%; border-collapse: collapse; }
+  .cs-table th, .cs-table td {
+    padding: 7px 8px; border: 1px solid var(--border); text-align: center; font-size: 12px;
+  }
+  .cs-table th { background: var(--bg-surface-alt); color: var(--text-secondary); font-weight: 600; }
+
+  /* Two-column lower section (Freq/OC + Power) */
+  .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 820px) { .two-col { grid-template-columns: 1fr; } }
+  .limit-row {
+    display: grid; grid-template-columns: 140px 1fr 70px; align-items: center; gap: 10px; padding: 6px 0;
+  }
+  input[type="range"] { width: 100%; accent-color: var(--accent); }
+
+  .hidden { display: none !important; }
+  .toast {
+    position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+    background: #1e293b; color: #f8fafc; border: 1px solid var(--accent);
+    padding: 7px 14px; border-radius: 6px; font-size: 12px; z-index: 50;
+  }
+</style>
+</head>
+<body>
+
+<div class="proto-bar">
+  <div style="display:flex;align-items:center;gap:10px">
+    <span class="badge">Round 4 收敛原型</span>
+    <strong>互斥模式（CO vs CS、全核/CCD/分核、FMax vs OC）+ 24 核高密度扩展</strong>
+  </div>
+  <div class="seg" id="archSeg">
+    <button class="active" onclick="setCpu('amd24', this)">AMD 24核 (2×12核 CCD)</button>
+    <button onclick="setCpu('intel24', this)">Intel 24核 (8P + 16E · 含未来分核睿频)</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <!-- Live-First Preset Bar -->
+  <div class="preset-strip">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span class="pill pill-good" id="persistPill">AMD SMU · 固件持久</span>
+      <span class="sub">参考方案：</span>
+      <select class="flat-select"><option>24核日常负压 (按当前选中模式保存)</option><option>出厂基线</option></select>
+      <span class="pill pill-muted" id="saveModeHint">将保存：CO · 按 CCD</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button class="btn" onclick="toast('还原参考值')">还原</button>
+      <button class="btn" onclick="toast('仅保存当前激活的互斥模式到方案')">另存为方案…</button>
+      <button class="btn btn-primary" onclick="toast('写入硬件并回读校验')">应用并回读</button>
+    </div>
+  </div>
+
+  <!-- SECTION 1: VOLTAGE / CURVE (Mutually Exclusive: CO vs CS on AMD; Voltage Planes on Intel) -->
+  <section class="box" id="curveSection">
+    <div class="box-head">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <strong id="curveTitle">电压曲线调校</strong>
+        <!-- Exclusive Curve Mode Switch (AMD: CO vs CS) -->
+        <div class="seg" id="curveModeSeg">
+          <button class="active" onclick="setCurveMode('co', this)">Curve Optimizer (CO)</button>
+          <button onclick="setCurveMode('cs', this)">Curve Shaper (CS)</button>
+        </div>
+      </div>
+
+      <!-- Exclusive Scope Switch (All / Cluster / Per-Core) -->
+      <div class="seg" id="scopeSeg">
+        <button onclick="setScope('all', this)">全核统一</button>
+        <button class="active" onclick="setScope('cluster', this)">按 CCD</button>
+        <button onclick="setScope('core', this)">逐核 (24核)</button>
+      </div>
+    </div>
+
+    <div class="box-body">
+      <!-- CO: ALL CORES -->
+      <div id="co-all" class="hidden">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg-surface-alt);border-radius:6px;margin-bottom:10px">
+          <div><strong>全部 24 核统一偏移</strong><div class="sub">保存与生效粒度：全核统一（覆盖各 CCD / 单核）</div></div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <button class="btn btn-sm" onclick="adjAll(-5)">-5</button>
+            <input class="num-input" id="allValInput" value="-20" style="width:54px;height:28px;font-size:14px" />
+            <button class="btn btn-sm" onclick="adjAll(5)">+5</button>
+          </div>
+        </div>
+        <div class="sub" style="margin-bottom:6px">24 核当前生效预览（只读紧凑带）：</div>
+        <div class="mini-strip-grid" id="allPreviewGrid"></div>
+      </div>
+
+      <!-- CO: PER-CLUSTER (CCD0 / CCD1 or P-Core / E-Core) -->
+      <div id="co-cluster">
+        <div class="two-col" id="clusterCards"></div>
+      </div>
+
+      <!-- CO: PER-CORE (Collapsible Clusters for 24 cores!) -->
+      <div id="co-core" class="hidden" style="display:flex;flex-direction:column;gap:8px">
+        <div class="sub">提示：多核处理器按 CCD / 核心簇折叠，只展开你正在微调的簇，避免 24 个输入框同时铺满屏幕。</div>
+        <div id="perCoreAccordion" style="display:flex;flex-direction:column;gap:8px"></div>
+      </div>
+
+      <!-- CS: CURVE SHAPER (Exclusive with CO) -->
+      <div id="cs-view" class="hidden">
+        <div class="sub" style="margin-bottom:8px">Curve Shaper 与 CO 互斥保存；按「温度段 × 频率段」统一塑形：</div>
+        <table class="cs-table">
+          <thead><tr><th>温度 \ 频率段</th><th>Min</th><th>Low</th><th>Med</th><th>High</th><th>Max</th></tr></thead>
+          <tbody>
+            <tr><th>低温</th><td><input class="num-input" value="0"/></td><td><input class="num-input" value="-10"/></td><td><input class="num-input" value="-15"/></td><td><input class="num-input" value="-20"/></td><td><input class="num-input" value="-15"/></td></tr>
+            <tr><th>中温</th><td><input class="num-input" value="0"/></td><td><input class="num-input" value="-10"/></td><td><input class="num-input" value="-20"/></td><td><input class="num-input" value="-25"/></td><td><input class="num-input" value="-20"/></td></tr>
+            <tr><th>高温</th><td><input class="num-input" value="0"/></td><td><input class="num-input" value="-5"/></td><td><input class="num-input" value="-15"/></td><td><input class="num-input" value="-15"/></td><td><input class="num-input" value="-10"/></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 2: FREQUENCY / RATIO (Mutually Exclusive: FMax vs OC on AMD; Active-Core vs Per-Core Ratio on Intel) -->
+  <div class="two-col">
+    <section class="box">
+      <div class="box-head">
+        <strong id="freqTitle">频率与超频模式</strong>
+        <div class="seg" id="freqModeSeg">
+          <button class="active" onclick="setFreqMode('boost', this)" id="freqBtn1">FMax 加速上限</button>
+          <button onclick="setFreqMode('oc', this)" id="freqBtn2">手动定频 OC (支持全核/CCD/分核)</button>
+        </div>
+      </div>
+      <div class="box-body">
+        <div id="freq-boost">
+          <div class="limit-row">
+            <div><strong id="freqLabel1">FMax 上限</strong><div class="sub" id="freqSub1">基线 5700 MHz</div></div>
+            <input type="range" min="4450" max="5750" step="25" value="5450" />
+            <input class="num-input" value="5450" style="width:62px" />
+          </div>
+          <div class="sub" id="freqHint">注：FMax 与全核定频 OC 互斥，当前以动态加速上限模式保存。</div>
+        </div>
+        <div id="freq-oc" class="hidden">
+          <div id="ocContent"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 3: POWER LIMITS -->
+    <section class="box">
+      <div class="box-head"><strong>功耗、电流与温度墙</strong><span class="sub">按平台能力显隐（不支持项默认隐藏）</span></div>
+      <div class="box-body">
+        <div class="limit-row">
+          <div><strong id="pwr1">PPT 封装功耗</strong><div class="sub">默认 170 W</div></div>
+          <input type="range" min="65" max="250" value="155" />
+          <input class="num-input" value="155 W" style="width:62px" />
+        </div>
+        <div class="limit-row">
+          <div><strong id="pwr2">TDC / EDC 限制</strong><div class="sub">默认 120 / 180 A</div></div>
+          <input type="range" min="50" max="220" value="120" />
+          <input class="num-input" value="120 A" style="width:62px" />
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="toast hidden" id="toastEl"></div>
+
+<script>
+  let cpu = 'amd24';
+  let curveMode = 'co';
+  let scope = 'cluster';
+  let allVal = -20;
+
+  function setCpu(c, btn) {
+    cpu = c;
+    document.querySelectorAll('#archSeg button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    const isIntel = c === 'intel24';
+    document.getElementById('persistPill').textContent = isIntel ? 'Intel MSR · 仅当前会话有效' : 'AMD SMU · 固件持久';
+    document.getElementById('persistPill').className = 'pill ' + (isIntel ? 'pill-warn' : 'pill-good');
+
+    document.getElementById('curveTitle').textContent = isIntel ? '电压偏移 (OC Mailbox 0x150)' : '电压曲线调校';
+    document.getElementById('curveModeSeg').classList.toggle('hidden', isIntel);
+    if (isIntel) curveMode = 'co';
+
+    document.querySelector('#scopeSeg button:nth-child(2)').textContent = isIntel ? '按 P/E 核簇' : '按 CCD';
+    document.getElementById('freqTitle').textContent = isIntel ? '睿频倍频模式 (0x1AD / 扩展)' : '频率与超频模式';
+    document.getElementById('freqBtn1').textContent = isIntel ? '活跃核数 8 档' : 'FMax 加速上限';
+    document.getElementById('freqBtn2').textContent = isIntel ? '分核睿频 (未来扩展)' : '全核定频 OC';
+    document.getElementById('pwr1').textContent = isIntel ? 'PL1 持续功耗' : 'PPT 封装功耗';
+    document.getElementById('pwr2').textContent = isIntel ? 'PL2 短时功耗' : 'TDC / EDC 限制';
+
+    renderAll();
+  }
+
+  function setCurveMode(m, btn) {
+    curveMode = m;
+    document.querySelectorAll('#curveModeSeg button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('scopeSeg').classList.toggle('hidden', m === 'cs');
+    renderAll();
+  }
+
+  function setScope(s, btn) {
+    scope = s;
+    document.querySelectorAll('#scopeSeg button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderAll();
+  }
+
+  function setFreqMode(m, btn) {
+    document.querySelectorAll('#freqModeSeg button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('freq-boost').classList.toggle('hidden', m !== 'boost');
+    document.getElementById('freq-oc').classList.toggle('hidden', m !== 'oc');
+    if (m === 'oc') {
+      const oc = document.getElementById('ocContent');
+      if (cpu === 'intel24') {
+        oc.innerHTML = `<div class="sub" style="margin-bottom:6px">Intel 未来扩展：按 P-Core / E-Core 分核设倍频上限（复用高密度核格）：</div>
+          <div class="core-grid-dense">
+            ${[0,1,2,3,4,5,6,7].map(i => `<div class="dense-cell"><div style="display:flex;justify-content:space-between;font-size:11px"><span>P${i}</span><span class="sub">倍频</span></div><input class="num-input" value="57x" style="width:100%"/></div>`).join('')}
+          </div>`;
+      } else {
+        oc.innerHTML = `<div class="limit-row"><strong>全核定频目标</strong><input type="range" min="3800" max="5600" value="5200"/><input class="num-input" value="5200" style="width:62px"/></div>
+          <div class="limit-row"><strong>手动核心电压</strong><input type="range" min="950" max="1350" value="1180"/><input class="num-input" value="1.18V" style="width:62px"/></div>`;
+      }
+    }
+  }
+
+  function adjAll(d) {
+    allVal = Math.max(-50, Math.min(50, allVal + d));
+    document.getElementById('allValInput').value = allVal;
+    renderAll();
+  }
+
+  function renderAll() {
+    document.getElementById('co-all').classList.toggle('hidden', curveMode !== 'co' || scope !== 'all');
+    document.getElementById('co-cluster').classList.toggle('hidden', curveMode !== 'co' || scope !== 'cluster');
+    document.getElementById('co-core').classList.toggle('hidden', curveMode !== 'co' || scope !== 'core');
+    document.getElementById('cs-view').classList.toggle('hidden', curveMode !== 'cs');
+
+    const modeName = curveMode === 'cs' ? 'Curve Shaper' : (scope === 'all' ? 'CO · 全核统一' : scope === 'cluster' ? (cpu === 'intel24' ? '电压 · 按 P/E 簇' : 'CO · 按 CCD') : 'CO · 逐核 (24核)');
+    document.getElementById('saveModeHint').textContent = `当前保存模式：${modeName}`;
+
+    // All-Core 24-core preview
+    const apg = document.getElementById('allPreviewGrid');
+    apg.innerHTML = '';
+    for (let i = 0; i < 24; i++) {
+      apg.innerHTML += `<div class="mini-chip"><span class="c">${cpu==='intel24'?(i<8?'P'+i:'E'+(i-8)):'C'+i}</span><span class="v">${allVal}</span></div>`;
+    }
+
+    // Cluster cards
+    const cc = document.getElementById('clusterCards');
+    const clusters = cpu === 'intel24'
+      ? [{ name: 'P-Core 性能核 (0–7)', val: -45, unit: 'mV' }, { name: 'E-Core 能效核 (8–23)', val: -30, unit: 'mV' }]
+      : [{ name: 'CCD 0 (Core 0–11)', val: -25, unit: '' }, { name: 'CCD 1 (Core 12–23)', val: -15, unit: '' }];
+    cc.innerHTML = clusters.map(cl => `
+      <div class="cluster-card" style="padding:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <strong>${cl.name}</strong>
+          <div style="display:flex;gap:4px;align-items:center">
+            <button class="btn btn-sm">-</button>
+            <input class="num-input" value="${cl.val}${cl.unit}" style="width:58px"/>
+            <button class="btn btn-sm">+</button>
+          </div>
+        </div>
+        <div class="sub">整簇统一生效，保存时只记录此粒度，避免 24 格视觉拥挤。</div>
+      </div>
+    `).join('');
+
+    // Per-Core 24-core Collapsible Accordion (Cluster 0 expanded, Cluster 1 collapsed by default)
+    const acc = document.getElementById('perCoreAccordion');
+    const groups = cpu === 'intel24'
+      ? [{ id: 0, title: 'P-Core 簇 (8核)', count: 8, prefix: 'P', def: -45, open: true }, { id: 1, title: 'E-Core 簇 (16核)', count: 16, prefix: 'E', def: -30, open: false }]
+      : [{ id: 0, title: 'CCD 0 (Core 0–11 · 12核)', count: 12, prefix: 'C', def: -25, open: true }, { id: 1, title: 'CCD 1 (Core 12–23 · 12核)', count: 12, prefix: 'C', def: -15, open: false }];
+
+    acc.innerHTML = groups.map(g => `
+      <div class="cluster-card">
+        <div class="cluster-head" onclick="this.nextElementSibling.classList.toggle('hidden')">
+          <div><strong>${g.title}</strong> <span class="sub" style="margin-left:8px">点击展开/折叠 · 均值 ${g.def}</span></div>
+          <div style="display:flex;gap:4px" onclick="event.stopPropagation()">
+            <button class="btn btn-sm" onclick="toast('整簇 -5')">整簇 -5</button>
+            <button class="btn btn-sm" onclick="toast('整簇 +5')">整簇 +5</button>
+          </div>
+        </div>
+        <div class="cluster-body ${g.open ? '' : 'hidden'}">
+          <div class="core-grid-dense">
+            ${Array.from({length: g.count}, (_, idx) => `
+              <div class="dense-cell">
+                <div style="display:flex;justify-content:space-between;font-size:11px"><span>${g.prefix}${idx}</span><span class="sub">回读 ${g.def}</span></div>
+                <div class="bar-track"><div class="bar-zero"></div><div class="bar-fill" style="left:25%;width:25%"></div></div>
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <input class="num-input" value="${g.def}" />
+                  <span class="sub" style="cursor:pointer" onclick="toast('切换 Auto')">Auto</span>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function toast(msg) {
+    const el = document.getElementById('toastEl');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    clearTimeout(window._t);
+    window._t = setTimeout(() => el.classList.add('hidden'), 2200);
+  }
+
+  renderAll();
+</script>
+</body>
+</html>

@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Zentwik UI 原型 · CO 调校：均衡器式拓扑矩阵</title>
+<style>
+  :root {
+    --bg-window: #0d1015;
+    --bg-surface: #171c26;
+    --bg-surface-alt: #1e2430;
+    --bg-hover: #252d3d;
+    --border: #283042;
+    --border-strong: #3a465e;
+    --text-primary: #eef2f8;
+    --text-secondary: #9aa6bc;
+    --text-muted: #6c7890;
+    --accent: #3b82f6;
+    --accent-subtle: rgba(59, 130, 246, 0.16);
+    --accent-border: rgba(59, 130, 246, 0.55);
+    --good: #22c55e;
+    --good-subtle: rgba(34, 197, 94, 0.14);
+    --warn: #f59e0b;
+    --warn-subtle: rgba(245, 158, 11, 0.14);
+    --radius: 6px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg-window); color: var(--text-primary);
+    font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+    font-size: 13px; line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .proto-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    padding: 8px 16px; background: #111620; border-bottom: 1px solid var(--border);
+  }
+  .badge {
+    background: var(--accent-subtle); color: #93c5fd; border: 1px solid var(--accent-border);
+    padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
+  }
+  .sub { color: var(--text-secondary); font-size: 11.5px; }
+
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+
+  /* Live-First Top Preset Strip */
+  .preset-strip {
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+    padding: 10px 14px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
+  }
+  .preset-strip.dirty {
+    border-color: var(--warn);
+    background: linear-gradient(90deg, var(--warn-subtle) 0%, var(--bg-surface) 38%);
+  }
+
+  .btn {
+    height: 28px; padding: 0 10px; border-radius: var(--radius);
+    border: 1px solid var(--border-strong); background: var(--bg-surface-alt);
+    color: var(--text-primary); cursor: pointer; font-size: 12px;
+  }
+  .btn:hover { background: var(--bg-hover); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .btn-sm { height: 22px; padding: 0 7px; font-size: 11px; }
+
+  .pill {
+    display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 3px;
+    font-size: 11px; font-weight: 600;
+  }
+  .pill-good { background: var(--good-subtle); color: var(--good); }
+  .pill-warn { background: var(--warn-subtle); color: var(--warn); }
+  .pill-muted { background: var(--bg-surface-alt); color: var(--text-secondary); }
+
+  select.flat-select {
+    height: 28px; padding: 0 8px; border-radius: var(--radius);
+    background: var(--bg-surface-alt); border: 1px solid var(--border-strong);
+    color: var(--text-primary); font-size: 12px;
+  }
+
+  /* Main 2-column layout: Left = CO EQ Matrix, Right = FMax + Quick Batch */
+  .tuning-layout {
+    display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(260px, 0.75fr); gap: 12px;
+    align-items: start;
+  }
+  @media (max-width: 860px) { .tuning-layout { grid-template-columns: 1fr; } }
+
+  .box {
+    background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+  }
+  .box-head {
+    padding: 10px 14px; background: var(--bg-surface-alt); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .box-body { padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+
+  /* CCD Block */
+  .ccd-block {
+    background: var(--bg-surface-alt); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 12px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .ccd-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+  }
+  .ccd-actions { display: flex; align-items: center; gap: 6px; }
+
+  /* EQ Fader Grid: 4 columns per CCD */
+  .eq-grid {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px;
+  }
+  @media (max-width: 620px) { .eq-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+  .eq-cell {
+    background: var(--bg-surface); border: 1px solid var(--border); border-radius: 5px;
+    padding: 8px 10px; display: flex; flex-direction: column; gap: 6px;
+    transition: border-color .12s;
+  }
+  .eq-cell:hover { border-color: var(--border-strong); }
+  .eq-cell.dirty { border-color: var(--warn); }
+  .eq-cell.auto { opacity: 0.65; }
+
+  .eq-top { display: flex; align-items: center; justify-content: space-between; font-size: 11.5px; }
+  .eq-core-name { font-weight: 600; color: var(--text-primary); }
+  .eq-src { font-size: 10.5px; color: var(--text-muted); cursor: pointer; }
+  .eq-src:hover { color: var(--accent); text-decoration: underline; }
+
+  /* Visual Bar (Negative = blue/cyan left, Positive = warn right, centered zero) */
+  .bar-track {
+    position: relative; height: 10px; background: #10141c;
+    border: 1px solid var(--border); border-radius: 3px; cursor: ew-resize;
+    overflow: hidden;
+  }
+  .bar-zero {
+    position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--border-strong);
+  }
+  .bar-fill {
+    position: absolute; top: 1px; bottom: 1px; border-radius: 2px;
+    background: var(--accent);
+  }
+  .bar-fill.pos { background: var(--warn); }
+
+  /* Inline Numeric Input + Mini Stepper on hover/focus */
+  .eq-bottom { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+  .num-input {
+    width: 48px; height: 24px; padding: 0 4px; text-align: center;
+    background: var(--bg-surface-alt); border: 1px solid var(--border);
+    border-radius: 4px; color: var(--text-primary); font-weight: 700; font-size: 13px;
+  }
+  .num-input:focus { outline: none; border-color: var(--accent); }
+  .eq-actual { font-size: 11px; color: var(--text-muted); }
+
+  /* Right Column: FMax & Global Offset */
+  .side-stack { display: flex; flex-direction: column; gap: 12px; }
+  .slider-row { display: flex; flex-direction: column; gap: 8px; }
+  input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+  .big-val { font-size: 22px; font-weight: 700; }
+
+  .toast {
+    position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+    background: #1e293b; color: #f8fafc; border: 1px solid var(--accent);
+    padding: 7px 14px; border-radius: 6px; font-size: 12px; z-index: 50;
+  }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="proto-bar">
+  <div style="display:flex;align-items:center;gap:10px">
+    <span class="badge">新思路原型 · EQ 均衡器式 CO 矩阵</span>
+    <span>借鉴 <strong>Ryzen Master / SMUDebugTool / G-Helper</strong>：把重复按钮换成「直观偏移条 + 直接输入 + 整组平移」</span>
+  </div>
+  <div class="sub">提示：点击/拖动每颗核的偏移条、直接改数字、或用 CCD 头的「整体 -1 / +1 / 归零」</div>
+</div>
+
+<div class="wrap">
+  <!-- Live-First Strip -->
+  <div class="preset-strip dirty" id="strip">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span class="pill pill-good">AMD SMU · 固件持久</span>
+      <span class="sub">参考方案：</span>
+      <select class="flat-select">
+        <option>游戏负压 (CCD0 -25 / CCD1 -15)</option>
+        <option>出厂基线 (全 0)</option>
+      </select>
+      <span class="pill pill-warn" id="dirtyPill">已修改 1 项（未应用）</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button class="btn" onclick="resetAll()">还原</button>
+      <button class="btn" onclick="toast('另存为新 CpuTuningPlan')">另存为方案…</button>
+      <button class="btn btn-primary" onclick="applyAll()">应用并回读</button>
+    </div>
+  </div>
+
+  <div class="tuning-layout">
+    <!-- Left: Curve Optimizer EQ Matrix -->
+    <div class="box">
+      <div class="box-head">
+        <div>
+          <strong>Curve Optimizer 核心偏移分布</strong>
+          <span class="sub" style="margin-left:8px">拖动/点击条形快速设定，点右上角可切 Auto</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="sub">全部核：</span>
+          <button class="btn btn-sm" onclick="shiftAll(-5)">-5</button>
+          <button class="btn btn-sm" onclick="shiftAll(-1)">-1</button>
+          <button class="btn btn-sm" onclick="shiftAll(1)">+1</button>
+          <button class="btn btn-sm" onclick="shiftAll(5)">+5</button>
+          <button class="btn btn-sm" onclick="zeroAll()">归零</button>
+        </div>
+      </div>
+
+      <div class="box-body" id="ccdContainer"></div>
+    </div>
+
+    <!-- Right: FMax & Safety -->
+    <div class="side-stack">
+      <div class="box">
+        <div class="box-head"><strong>FMax 最高加速频率</strong><span class="sub">容差 ±10 MHz</span></div>
+        <div class="box-body">
+          <div style="display:flex;align-items:baseline;justify-content:space-between">
+            <div><span class="big-val" id="fmaxVal">5450</span> <span class="sub">MHz</span></div>
+            <span class="sub">回读：<strong id="fmaxActual">5450</strong> MHz</span>
+          </div>
+          <div class="slider-row">
+            <input type="range" min="4450" max="5750" step="25" value="5450" id="fmaxSlider" oninput="setFmax(this.value)" />
+            <div style="display:flex;justify-content:space-between" class="sub"><span>4450</span><span>基线 5700</span><span>5750</span></div>
+          </div>
+          <div style="display:flex;gap:6px;justify-content:flex-end">
+            <button class="btn btn-sm" onclick="setFmax(5700)">恢复基线 (5700)</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="box">
+        <div class="box-head"><strong>持久性与保护</strong></div>
+        <div class="box-body" style="gap:8px;font-size:12px">
+          <div style="display:flex;justify-content:space-between"><span class="sub">写入持久性</span><span class="pill pill-good">固件持久</span></div>
+          <div style="display:flex;justify-content:space-between"><span class="sub">BootGuard 防砖</span><span class="pill pill-good">正常 (0 次异常)</span></div>
+          <div style="display:flex;justify-content:space-between"><span class="sub">休眠恢复补写</span><span class="pill pill-good">已启用</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast hidden" id="toastEl"></div>
+
+<script>
+  const cores = [
+    { id: 0, ccd: 0, val: -25, actual: -25, auto: false },
+    { id: 1, ccd: 0, val: -25, actual: -25, auto: false },
+    { id: 2, ccd: 0, val: -30, actual: -25, auto: false },
+    { id: 3, ccd: 0, val: 0,   actual: 0,   auto: true  },
+    { id: 4, ccd: 1, val: -15, actual: -15, auto: false },
+    { id: 5, ccd: 1, val: -15, actual: -15, auto: false },
+    { id: 6, ccd: 1, val: -15, actual: -15, auto: false },
+    { id: 7, ccd: 1, val: -15, actual: -15, auto: false }
+  ];
+  let fmax = 5450, actualFmax = 5450;
+
+  function render() {
+    const container = document.getElementById('ccdContainer');
+    container.innerHTML = '';
+    let dirtyCount = fmax !== actualFmax ? 1 : 0;
+
+    [0, 1].forEach(ccd => {
+      const group = cores.filter(c => c.ccd === ccd);
+      const blk = document.createElement('div');
+      blk.className = 'ccd-block';
+      blk.innerHTML = `
+        <div class="ccd-head">
+          <div><strong>CCD ${ccd}</strong> <span class="sub">Core ${ccd*4}–${ccd*4+3}</span></div>
+          <div class="ccd-actions">
+            <span class="sub">整组平移：</span>
+            <button class="btn btn-sm" onclick="shiftCcd(${ccd}, -5)">-5</button>
+            <button class="btn btn-sm" onclick="shiftCcd(${ccd}, -1)">-1</button>
+            <button class="btn btn-sm" onclick="shiftCcd(${ccd}, 1)">+1</button>
+            <button class="btn btn-sm" onclick="shiftCcd(${ccd}, 5)">+5</button>
+          </div>
+        </div>
+        <div class="eq-grid"></div>
+      `;
+      const grid = blk.querySelector('.eq-grid');
+
+      group.forEach(c => {
+        const isDirty = !c.auto && c.val !== c.actual;
+        if (isDirty) dirtyCount++;
+        const cell = document.createElement('div');
+        cell.className = 'eq-cell' + (isDirty ? ' dirty' : '') + (c.auto ? ' auto' : '');
+
+        // Compute bar geometry (-50 .. +50 around 50%)
+        const pct = Math.abs(c.val) / 50 * 50;
+        const left = c.val < 0 ? (50 - pct) : 50;
+        const barStyle = c.auto ? 'width:0%' : `left:${left}%;width:${pct}%`;
+
+        cell.innerHTML = `
+          <div class="eq-top">
+            <span class="eq-core-name">Core ${c.id}</span>
+            <span class="eq-src" onclick="toggleAuto(${c.id})" title="点击切换 Auto 跳过">${c.auto ? 'Auto' : '设为Auto'}</span>
+          </div>
+          <div class="bar-track" title="点击或左右拖动直接设值 (-50..+50)" onmousedown="startDrag(event, ${c.id})">
+            <div class="bar-zero"></div>
+            <div class="bar-fill ${c.val > 0 ? 'pos' : ''}" style="${barStyle}"></div>
+          </div>
+          <div class="eq-bottom">
+            <input class="num-input" type="text" value="${c.auto ? 'Auto' : c.val}" ${c.auto ? 'disabled' : ''} onchange="setCore(${c.id}, this.value)" />
+            <span class="eq-actual">回读 ${c.actual}</span>
+          </div>
+        `;
+        grid.appendChild(cell);
+      });
+      container.appendChild(blk);
+    });
+
+    const strip = document.getElementById('strip');
+    const pill = document.getElementById('dirtyPill');
+    if (dirtyCount > 0) {
+      strip.classList.add('dirty');
+      pill.textContent = `已修改 ${dirtyCount} 项（未应用）`;
+      pill.className = 'pill pill-warn';
+    } else {
+      strip.classList.remove('dirty');
+      pill.textContent = '硬件实际值已对齐';
+      pill.className = 'pill pill-good';
+    }
+  }
+
+  function clamp(v) { return Math.max(-50, Math.min(50, Math.round(v))); }
+  window.setCore = (id, v) => {
+    const n = parseInt(v, 10);
+    if (!isNaN(n)) { cores[id].auto = false; cores[id].val = clamp(n); }
+    render();
+  };
+  window.toggleAuto = id => { cores[id].auto = !cores[id].auto; render(); };
+  window.shiftCcd = (ccd, d) => {
+    cores.filter(c => c.ccd === ccd && !c.auto).forEach(c => c.val = clamp(c.val + d));
+    render();
+  };
+  window.shiftAll = d => {
+    cores.filter(c => !c.auto).forEach(c => c.val = clamp(c.val + d));
+    render();
+  };
+  window.zeroAll = () => { cores.forEach(c => { c.auto = false; c.val = 0; }); render(); };
+  window.setFmax = v => {
+    fmax = Number(v);
+    document.getElementById('fmaxVal').textContent = fmax;
+    document.getElementById('fmaxSlider').value = fmax;
+    render();
+  };
+  window.applyAll = () => {
+    cores.forEach(c => { if (!c.auto) c.actual = c.val; });
+    actualFmax = fmax;
+    document.getElementById('fmaxActual').textContent = actualFmax;
+    render();
+    toast('已写入 SMU 并完成逐核回读校验');
+  };
+  window.resetAll = () => {
+    const def = [-25,-25,-25,0,-15,-15,-15,-15];
+    cores.forEach((c, i) => { c.val = def[i]; c.actual = def[i]; c.auto = i === 3; });
+    fmax = 5450; actualFmax = 5450;
+    document.getElementById('fmaxVal').textContent = 5450;
+    document.getElementById('fmaxActual').textContent = 5450;
+    document.getElementById('fmaxSlider').value = 5450;
+    render();
+    toast('已还原参考方案');
+  };
+
+  window.startDrag = (e, id) => {
+    const track = e.currentTarget;
+    const update = clientX => {
+      const rect = track.getBoundingClientRect();
+      const ratio = (clientX - rect.left) / rect.width;
+      cores[id].auto = false;
+      cores[id].val = clamp((ratio - 0.5) * 100);
+      render();
+    };
+    update(e.clientX);
+    const onMove = ev => update(ev.clientX);
+    const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  function toast(msg) {
+    const el = document.getElementById('toastEl');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    clearTimeout(window._t);
+    window._t = setTimeout(() => el.classList.add('hidden'), 2200);
+  }
+
+  render();
+</script>
+</body>
+</html>

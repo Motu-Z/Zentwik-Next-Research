@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Zentwik UI 原型 · Round 3.5 纯图标标题栏工具栏与三档密度</title>
+<style>
+  :root {
+    --bg-window: #0d1015;
+    --bg-titlebar: #0a0c10;
+    --bg-rail: #12161e;
+    --bg-surface: #171c26;
+    --bg-surface-alt: #1e2430;
+    --bg-hover: #242b3a;
+    --border: #283042;
+    --border-strong: #37435a;
+    --text-primary: #eef2f8;
+    --text-secondary: #9aa6bc;
+    --text-muted: #6c7890;
+    --accent: #3b82f6;
+    --accent-subtle: rgba(59, 130, 246, 0.14);
+    --accent-border: rgba(59, 130, 246, 0.45);
+    --good: #22c55e;
+    --good-subtle: rgba(34, 197, 94, 0.14);
+    --warn: #f59e0b;
+    --warn-subtle: rgba(245, 158, 11, 0.14);
+    --bad: #ef4444;
+    --bad-subtle: rgba(239, 68, 68, 0.14);
+    --info: #38bdf8;
+    --info-subtle: rgba(56, 189, 248, 0.14);
+
+    --pad-panel: 16px;
+    --pad-cell: 10px 12px;
+    --gap: 12px;
+    --font-size: 13px;
+    --radius: 6px;
+  }
+
+  [data-theme="light"] {
+    --bg-window: #f3f5f8;
+    --bg-titlebar: #e6ebf2;
+    --bg-rail: #ecf0f6;
+    --bg-surface: #ffffff;
+    --bg-surface-alt: #f6f8fb;
+    --bg-hover: #e9eef6;
+    --border: #dce2ec;
+    --border-strong: #c4cedd;
+    --text-primary: #141923;
+    --text-secondary: #4e5b70;
+    --text-muted: #7a879c;
+    --accent-subtle: rgba(59, 130, 246, 0.10);
+    --good-subtle: rgba(22, 163, 74, 0.10);
+    --warn-subtle: rgba(217, 119, 6, 0.10);
+    --bad-subtle: rgba(220, 38, 38, 0.10);
+    --info-subtle: rgba(2, 132, 199, 0.10);
+  }
+
+  [data-density="relaxed"] {
+    --pad-panel: 22px;
+    --pad-cell: 12px 16px;
+    --gap: 16px;
+    --font-size: 13.5px;
+    --radius: 7px;
+  }
+
+  [data-density="compact"] {
+    --pad-panel: 10px;
+    --pad-cell: 6px 9px;
+    --gap: 8px;
+    --font-size: 12px;
+    --radius: 4px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #06080b;
+    color: var(--text-primary);
+    font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+    font-size: var(--font-size);
+    line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .proto-note {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 14px; background: #111620; border-bottom: 1px solid #263042;
+    color: #cbd5e1; font-size: 12px; gap: 10px; flex-wrap: wrap;
+  }
+  .proto-badge {
+    background: rgba(59,130,246,0.18); color: #93c5fd;
+    border: 1px solid rgba(59,130,246,0.4);
+    padding: 2px 8px; border-radius: 999px; font-weight: 600; font-size: 11px;
+  }
+
+  /* Desktop Window Frame */
+  .window-frame {
+    height: calc(100vh - 34px);
+    display: flex; flex-direction: column;
+    background: var(--bg-window);
+    color: var(--text-primary);
+    position: relative;
+  }
+
+  /* Custom WindowChrome Titlebar */
+  .titlebar {
+    height: 36px; min-height: 36px;
+    background: var(--bg-titlebar);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    padding-left: 12px;
+    user-select: none;
+    position: relative;
+    z-index: 30;
+  }
+  .titlebar-left {
+    display: flex; align-items: center; gap: 10px; min-width: 0;
+  }
+  .app-logo {
+    display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 12.5px;
+  }
+  .dot-live { width: 7px; height: 7px; border-radius: 50%; background: var(--good); }
+  .sys-chip {
+    font-size: 11px; color: var(--text-secondary);
+    padding: 1px 7px; border-radius: 4px;
+    background: var(--bg-surface); border: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  /* Right side: Uniform Icon Buttons (Quick Toolbar + Window Caption Buttons) */
+  .titlebar-right {
+    display: flex; align-items: center; height: 100%;
+  }
+  .quick-icons {
+    display: flex; align-items: center; height: 100%;
+    border-right: 1px solid var(--border);
+  }
+  .tb-icon-btn {
+    width: 40px; height: 100%; border: none; background: transparent;
+    color: var(--text-secondary); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .tb-icon-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .tb-icon-btn.open { background: var(--bg-surface); color: var(--accent); }
+  .tb-icon-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+  .icon-dot {
+    position: absolute; top: 8px; right: 8px;
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--good); border: 1.5px solid var(--bg-titlebar);
+  }
+  .icon-dot.warn { background: var(--warn); }
+
+  .caption-btns { display: flex; height: 100%; }
+  .cap-btn {
+    width: 44px; height: 100%; border: none; background: transparent;
+    color: var(--text-secondary); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .cap-btn svg { width: 11px; height: 11px; stroke: currentColor; fill: none; stroke-width: 1.5; }
+  .cap-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .cap-btn.close:hover { background: #dc2626; color: #fff; }
+
+  /* Flyout Popover anchored below titlebar icons */
+  .flyout {
+    position: absolute; top: 40px; right: 138px;
+    width: 286px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    padding: 12px;
+    z-index: 40;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .flyout.hidden { display: none; }
+  .flyout-title {
+    font-weight: 600; font-size: 12.5px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding-bottom: 6px; border-bottom: 1px solid var(--border);
+  }
+  .flyout-label { font-size: 11.5px; color: var(--text-secondary); margin-bottom: 4px; }
+  .seg {
+    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+    background: var(--bg-surface-alt); border: 1px solid var(--border);
+    border-radius: 5px; padding: 2px; gap: 2px;
+  }
+  .seg button {
+    border: none; background: transparent; color: var(--text-secondary);
+    padding: 4px 6px; border-radius: 3px; cursor: pointer; font-size: 11.5px;
+  }
+  .seg button.active { background: var(--accent); color: #fff; font-weight: 600; }
+
+  .accent-row { display: flex; align-items: center; gap: 8px; }
+  .accent-dot {
+    width: 18px; height: 18px; border-radius: 50%; border: 2px solid transparent; cursor: pointer;
+  }
+  .accent-dot.active { border-color: var(--text-primary); transform: scale(1.1); }
+
+  /* Body */
+  .workspace-body { flex: 1; min-height: 0; display: flex; }
+
+  /* C1 Left Rail */
+  .nav-rail {
+    width: 184px; min-width: 184px;
+    background: var(--bg-rail);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 8px;
+  }
+  [data-density="compact"] .nav-rail { width: 164px; min-width: 164px; padding: 6px; }
+  [data-density="relaxed"] .nav-rail { width: 204px; min-width: 204px; padding: 10px; }
+  .nav-group-label {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.6px;
+    color: var(--text-muted); padding: 8px 8px 4px;
+  }
+  .nav-item {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%; border: none; background: transparent;
+    color: var(--text-secondary); padding: 7px 10px;
+    border-radius: var(--radius); cursor: pointer; text-align: left;
+    font-size: var(--font-size); margin-bottom: 2px;
+  }
+  [data-density="relaxed"] .nav-item { padding: 9px 12px; }
+  [data-density="compact"] .nav-item { padding: 5px 8px; }
+  .nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .nav-item.active {
+    background: var(--accent-subtle); color: var(--text-primary);
+    font-weight: 600; box-shadow: inset 2px 0 0 var(--accent);
+  }
+  .nav-tag {
+    font-size: 10.5px; padding: 1px 5px; border-radius: 3px;
+    background: var(--bg-surface-alt); color: var(--text-secondary);
+  }
+  .nav-tag.good { background: var(--good-subtle); color: var(--good); }
+  .nav-tag.warn { background: var(--warn-subtle); color: var(--warn); }
+
+  /* Home Content Grid */
+  .main-pane {
+    flex: 1; min-width: 0; overflow-y: auto;
+    padding: var(--pad-panel);
+    display: flex; flex-direction: column; gap: var(--gap);
+  }
+
+  .kpi-row {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--gap);
+  }
+  .kpi-cell {
+    background: var(--bg-surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: var(--pad-cell);
+  }
+  .kpi-label { color: var(--text-secondary); font-size: 11.5px; display: flex; justify-content: space-between; }
+  .kpi-val { font-size: 20px; font-weight: 700; margin-top: 3px; }
+  [data-density="compact"] .kpi-val { font-size: 17px; }
+  [data-density="relaxed"] .kpi-val { font-size: 22px; }
+  .kpi-meta { color: var(--text-muted); font-size: 11px; margin-top: 3px; }
+
+  .home-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.9fr);
+    gap: var(--gap);
+    align-items: start;
+  }
+  @media (max-width: 980px) {
+    .home-grid { grid-template-columns: 1fr; }
+  }
+
+  .col-stack { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
+
+  .section-box {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .section-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: var(--pad-cell);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-surface-alt);
+    gap: 8px;
+  }
+  .section-title { font-weight: 600; }
+  .section-sub { color: var(--text-secondary); font-size: 11.5px; }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 7px; border-radius: 3px; font-size: 11px; font-weight: 600;
+  }
+  .pill-good { background: var(--good-subtle); color: var(--good); }
+  .pill-warn { background: var(--warn-subtle); color: var(--warn); }
+  .pill-bad { background: var(--bad-subtle); color: var(--bad); }
+  .pill-info { background: var(--info-subtle); color: var(--info); }
+  .pill-muted { background: var(--bg-surface-alt); color: var(--text-secondary); }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+    height: 26px; padding: 0 9px; border-radius: var(--radius);
+    border: 1px solid var(--border-strong); background: var(--bg-surface);
+    color: var(--text-primary); cursor: pointer; font-size: 11.5px; white-space: nowrap;
+  }
+  .btn:hover { background: var(--bg-hover); }
+
+  .chart-wrap { padding: 10px 12px; height: 155px; }
+  [data-density="compact"] .chart-wrap { height: 116px; }
+  [data-density="relaxed"] .chart-wrap { height: 185px; }
+  svg.spark { width: 100%; height: 100%; display: block; }
+  .chart-legend {
+    display: flex; gap: 12px; font-size: 11px; color: var(--text-secondary);
+    padding: 0 12px 8px;
+  }
+  .legend-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 4px; }
+
+  .domain-table { width: 100%; border-collapse: collapse; }
+  .domain-table td, .domain-table th {
+    padding: var(--pad-cell); border-bottom: 1px solid var(--border); text-align: left;
+  }
+  .domain-table tr:last-child td { border-bottom: none; }
+  .domain-table th { color: var(--text-muted); font-size: 11px; font-weight: 600; background: var(--bg-surface-alt); }
+
+  .timeline-filters {
+    display: flex; gap: 4px; padding: 8px 12px;
+    border-bottom: 1px solid var(--border); flex-wrap: wrap;
+  }
+  .filter-chip {
+    border: 1px solid var(--border); background: transparent;
+    color: var(--text-secondary); padding: 2px 8px; border-radius: 999px;
+    font-size: 11px; cursor: pointer;
+  }
+  .filter-chip.active {
+    background: var(--accent-subtle); color: var(--text-primary); border-color: var(--accent-border); font-weight: 600;
+  }
+  .timeline-list {
+    padding: var(--pad-cell); overflow-y: auto; max-height: 520px;
+    display: flex; flex-direction: column; gap: var(--gap);
+  }
+  .tl-item {
+    display: grid; grid-template-columns: 46px 14px 1fr; gap: 8px; align-items: start;
+  }
+  .tl-time { color: var(--text-muted); font-size: 11px; padding-top: 2px; }
+  .tl-axis { display: flex; flex-direction: column; align-items: center; height: 100%; }
+  .tl-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; background: var(--accent); }
+  .tl-dot.good { background: var(--good); }
+  .tl-dot.warn { background: var(--warn); }
+  .tl-line { width: 1px; flex: 1; background: var(--border); margin-top: 4px; min-height: 18px; }
+  .tl-card {
+    background: var(--bg-surface-alt); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: var(--pad-cell);
+  }
+  .tl-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-weight: 600; font-size: 12px; }
+  .tl-desc { color: var(--text-secondary); font-size: 11.5px; margin-top: 3px; }
+  .tl-actions { margin-top: 5px; display: flex; gap: 6px; }
+
+  .inspector {
+    width: 290px; min-width: 290px;
+    background: var(--bg-rail); border-left: 1px solid var(--border);
+    display: flex; flex-direction: column;
+  }
+  .inspector.collapsed { display: none; }
+  .inspector-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px; border-bottom: 1px solid var(--border); font-weight: 600;
+  }
+  .inspector-body { padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+  .ledger-row {
+    background: var(--bg-surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 8px 10px;
+  }
+
+  .toast {
+    position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+    background: #1e293b; color: #f8fafc; border: 1px solid var(--accent);
+    padding: 7px 14px; border-radius: 6px; font-size: 12px; z-index: 50;
+  }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="proto-note">
+  <div><span class="proto-badge">Round 3.5 原型</span> <strong>纯图标标题栏快捷工具栏（点击图标弹出面板） + 三档密度（宽松 / 标准 / 紧凑）</strong></div>
+  <div>提示：点击右上角最小化左侧的 <strong>3 个纯图标</strong>，体验弹出面板修改场景、账本、密度、主题与自定义强调色</div>
+</div>
+
+<div class="window-frame" id="win" data-theme="dark" data-density="standard">
+  <!-- Custom WindowChrome Titlebar -->
+  <header class="titlebar">
+    <div class="titlebar-left">
+      <div class="app-logo"><span class="dot-live"></span>Zentwik</div>
+      <span class="sys-chip">Ryzen 9 9955HX · AC 供电 · LocalSystem 服务</span>
+    </div>
+
+    <div class="titlebar-right">
+      <!-- Pure-Icon Quick Toolbar (Same visual weight as caption buttons) -->
+      <div class="quick-icons" aria-label="快捷工具栏">
+        <!-- Icon 1: Scene / Automation Popover -->
+        <button class="tb-icon-btn" id="btnScenePop" title="场景与自动化快控" aria-label="场景与自动化快控">
+          <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <span class="icon-dot" id="sceneDot"></span>
+        </button>
+
+        <!-- Icon 2: StateLedger Popover / Drawer -->
+        <button class="tb-icon-btn" id="btnLedgerPop" title="状态账本与接管" aria-label="状态账本与接管">
+          <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6"/><path d="M9 16h4"/></svg>
+          <span class="icon-dot warn" id="ledgerDot"></span>
+        </button>
+
+        <!-- Icon 3: Appearance / Density / Scale Popover -->
+        <button class="tb-icon-btn" id="btnAppearPop" title="外观、密度与缩放" aria-label="外观、密度与缩放">
+          <svg viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="2" y1="14" x2="6" y2="14"/><line x1="10" y1="8" x2="14" y2="8"/><line x1="18" y1="16" x2="22" y2="16"/></svg>
+        </button>
+      </div>
+
+      <!-- Standard Window Caption Buttons -->
+      <div class="caption-btns">
+        <button class="cap-btn" title="最小化" onclick="toast('窗口最小化')">
+          <svg viewBox="0 0 12 12"><line x1="1" y1="6" x2="11" y2="6"/></svg>
+        </button>
+        <button class="cap-btn" title="最大化 / 还原" onclick="toast('切换最大化 / 窗口化')">
+          <svg viewBox="0 0 12 12"><rect x="1.5" y="1.5" width="9" height="9"/></svg>
+        </button>
+        <button class="cap-btn close" title="关闭窗口" onclick="toast('关闭窗口（按设置最小化到托盘或退出）')">
+          <svg viewBox="0 0 12 12"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Flyout 1: Scene & Automation -->
+  <div class="flyout hidden" id="pop-scene" style="right: 218px;">
+    <div class="flyout-title">
+      <span>场景与自动化快控</span>
+      <span class="pill pill-good" id="popSceneBadge">游戏低延迟 (P10)</span>
+    </div>
+    <div>
+      <div class="flyout-label">快速切换 / 停用活动场景</div>
+      <div class="seg" id="sceneSeg">
+        <button class="active" onclick="setScene('游戏低延迟', true, this)">游戏低延迟</button>
+        <button onclick="setScene('离电续航', true, this)">离电续航</button>
+        <button onclick="setScene('无活动场景', false, this)">停用</button>
+      </div>
+    </div>
+    <div>
+      <div class="flyout-label">外部修改冲突策略</div>
+      <div class="seg" id="conflictSeg">
+        <button class="active" onclick="setConflict('尊重外部修改（默认）', this)">尊重外部修改</button>
+        <button onclick="setConflict('自动化优先', this)">自动化优先</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Flyout 2: StateLedger Quick View -->
+  <div class="flyout hidden" id="pop-ledger" style="right: 178px;">
+    <div class="flyout-title">
+      <span>状态账本快览</span>
+      <button class="btn" onclick="openInspector()">展开右侧检查器</button>
+    </div>
+    <div class="ledger-row">
+      <div style="display:flex;justify-content:space-between;font-weight:600;font-size:12px"><span>sched.9312.affinity</span><span class="pill pill-warn">用户接管</span></div>
+      <div class="section-sub" style="margin:3px 0 6px">obs64.exe 被外部改为 0xFF00，自动化已暂停</div>
+      <button class="btn" onclick="toast('已释放 obs64.exe 用户接管'); document.getElementById('ledgerDot').classList.add('hidden');">释放接管</button>
+    </div>
+    <div class="ledger-row">
+      <div style="display:flex;justify-content:space-between;font-weight:600;font-size:12px"><span>cpu.co.0..3 / fmax</span><span class="pill pill-good">已对齐</span></div>
+      <div class="section-sub">实测回读与当前期望完全一致</div>
+    </div>
+  </div>
+
+  <!-- Flyout 3: Appearance, Density & Custom Accent -->
+  <div class="flyout hidden" id="pop-appear" style="right: 138px;">
+    <div class="flyout-title"><span>外观与显示密度</span><span class="section-sub">即时生效</span></div>
+    <div>
+      <div class="flyout-label">界面密度</div>
+      <div class="seg" id="densitySeg">
+        <button onclick="setDensity('relaxed', this)">宽松</button>
+        <button class="active" onclick="setDensity('standard', this)">标准</button>
+        <button onclick="setDensity('compact', this)">紧凑</button>
+      </div>
+    </div>
+    <div>
+      <div class="flyout-label">主题模式</div>
+      <div class="seg" id="themeSeg">
+        <button class="active" onclick="setTheme('dark', this)">深色</button>
+        <button onclick="setTheme('light', this)">浅色</button>
+      </div>
+    </div>
+    <div>
+      <div class="flyout-label">强调色（支持自定义，不锁定默认色）</div>
+      <div class="accent-row">
+        <button class="accent-dot active" style="background:#3b82f6" onclick="setAccent('#3b82f6', this)"></button>
+        <button class="accent-dot" style="background:#8b5cf6" onclick="setAccent('#8b5cf6', this)"></button>
+        <button class="accent-dot" style="background:#14b8a6" onclick="setAccent('#14b8a6', this)"></button>
+        <button class="accent-dot" style="background:#f59e0b" onclick="setAccent('#f59e0b', this)"></button>
+        <input type="color" value="#3b82f6" title="自定义任意强调色" onchange="setAccent(this.value, null)" style="width:24px;height:20px;border:none;background:transparent;cursor:pointer;padding:0;" />
+      </div>
+    </div>
+  </div>
+
+  <div class="workspace-body">
+    <!-- C1 Left Navigation Rail -->
+    <aside class="nav-rail">
+      <div>
+        <div class="nav-group-label">实时控制与监控</div>
+        <button class="nav-item active"><span>首页总览</span><span class="nav-tag good">10Hz</span></button>
+        <button class="nav-item" onclick="toast('进入 CPU 调校（Live 直改 + 方案预设条）')"><span>CPU 调校</span><span class="nav-tag">AMD</span></button>
+        <button class="nav-item" onclick="toast('进入电源管理（AC/DC 策略矩阵）')"><span>电源管理</span><span class="nav-tag">AC/DC</span></button>
+        <button class="nav-item" onclick="toast('进入进程与调度（实时进程 + CPU Sets）')"><span>进程与调度</span><span class="nav-tag">2 规则</span></button>
+
+        <div class="nav-group-label">编排与预设</div>
+        <button class="nav-item" onclick="toast('进入场景自动化')"><span>场景自动化</span><span class="nav-tag good">运行中</span></button>
+        <button class="nav-item" onclick="toast('进入方案库')"><span>方案库</span><span class="nav-tag">6</span></button>
+      </div>
+      <div>
+        <div class="nav-group-label">系统</div>
+        <button class="nav-item" onclick="toast('进入能力与诊断')"><span>能力与诊断</span></button>
+        <button class="nav-item" onclick="toast('进入系统设置')"><span>系统设置</span></button>
+      </div>
+    </aside>
+
+    <!-- Home Overview Workspace -->
+    <main class="main-pane">
+      <div class="kpi-row">
+        <div class="kpi-cell">
+          <div class="kpi-label"><span>CPU 负载 / 封装温度</span><span class="pill pill-good">10Hz</span></div>
+          <div class="kpi-val">34% · 62°C</div>
+          <div class="kpi-meta">FMax 5450 MHz · CCD0 -25</div>
+        </div>
+        <div class="kpi-cell">
+          <div class="kpi-label"><span>GPU 负载 / 温度</span><span class="pill pill-info">监控中</span></div>
+          <div class="kpi-val">58% · 67°C</div>
+          <div class="kpi-meta">RTX 5070 Ti · 2410 MHz</div>
+        </div>
+        <div class="kpi-cell">
+          <div class="kpi-label"><span>内存使用率</span><span class="pill pill-muted">正常</span></div>
+          <div class="kpi-val">18.4 / 31.2 GB</div>
+          <div class="kpi-meta">59% · 无页面压力</div>
+        </div>
+        <div class="kpi-cell">
+          <div class="kpi-label"><span>活动场景与仲裁</span><span class="pill pill-good">P10</span></div>
+          <div class="kpi-val" id="kpiSceneName" style="font-size:15px;margin-top:5px">游戏低延迟</div>
+          <div class="kpi-meta">已控 CPU + 调度 · 1 项用户接管</div>
+        </div>
+      </div>
+
+      <div class="home-grid">
+        <div class="col-stack">
+          <div class="section-box">
+            <div class="section-head">
+              <div>
+                <div class="section-title">实时遥测曲线（CPU / GPU / 温度）</div>
+                <div class="section-sub">最近 60 秒滑窗 · 数据采样 10Hz，渲染 30Hz</div>
+              </div>
+              <span class="pill pill-good">新鲜 (38ms 前)</span>
+            </div>
+            <div class="chart-wrap">
+              <svg class="spark" viewBox="0 0 800 130" preserveAspectRatio="none">
+                <line x1="0" y1="32" x2="800" y2="32" stroke="var(--border)" stroke-dasharray="3,3" />
+                <line x1="0" y1="65" x2="800" y2="65" stroke="var(--border)" stroke-dasharray="3,3" />
+                <line x1="0" y1="98" x2="800" y2="98" stroke="var(--border)" stroke-dasharray="3,3" />
+                <polyline fill="none" stroke="var(--accent)" stroke-width="2" points="0,92 60,84 120,88 180,68 240,74 300,58 360,62 420,48 480,54 540,46 600,56 660,50 720,44 800,42"/>
+                <polyline fill="none" stroke="#14b8a6" stroke-width="1.8" points="0,78 60,72 120,66 180,58 240,60 300,52 360,48 420,44 480,46 540,40 600,42 660,38 720,36 800,34"/>
+                <polyline fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4,3" points="0,104 60,100 120,96 180,90 240,92 300,86 360,88 420,82 480,84 540,80 600,82 660,78 720,76 800,74"/>
+              </svg>
+            </div>
+            <div class="chart-legend">
+              <span><i class="legend-dot" style="background:var(--accent)"></i>CPU 负载 (34%)</span>
+              <span><i class="legend-dot" style="background:#14b8a6"></i>GPU 负载 (58%)</span>
+              <span><i class="legend-dot" style="background:#f59e0b"></i>CPU 封装温度 (62°C)</span>
+            </div>
+          </div>
+
+          <div class="section-box">
+            <div class="section-head">
+              <div>
+                <div class="section-title">三大控制域当前生效态</div>
+                <div class="section-sub">点击「直改」直接进入对应域调整实时参数</div>
+              </div>
+            </div>
+            <table class="domain-table">
+              <thead><tr><th>控制域</th><th>当前实际状态</th><th>来源 / 所有权</th><th>操作</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><strong>CPU 调校</strong></td>
+                  <td>CCD0 -25 · CCD1 -15 · FMax 5450</td>
+                  <td><span class="pill pill-good">Scene · 固件持久</span></td>
+                  <td><button class="btn" onclick="toast('跳转 CPU 调校页')">直改</button></td>
+                </tr>
+                <tr>
+                  <td><strong>电源管理</strong></td>
+                  <td>高性能 (AC: EPP 20% / Boost 高效)</td>
+                  <td><span class="pill pill-info">Plan · 手动应用</span></td>
+                  <td><button class="btn" onclick="toast('跳转电源管理页')">直改</button></td>
+                </tr>
+                <tr>
+                  <td><strong>进程与调度</strong></td>
+                  <td>2 条规则生效中 · obs64.exe 用户接管</td>
+                  <td><span class="pill pill-warn">混合 · 1 项接管</span></td>
+                  <td><button class="btn" onclick="toast('跳转进程与调度页')">直改</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Runtime Timeline -->
+        <div class="section-box">
+          <div class="section-head">
+            <div>
+              <div class="section-title">运行时间线</div>
+              <div class="section-sub">场景切换 · 方案应用 · 接管与漂移事件</div>
+            </div>
+            <button class="btn" onclick="toast('跳转完整诊断与审计日志')">全部记录</button>
+          </div>
+          <div class="timeline-filters">
+            <button class="filter-chip active" onclick="filterTl('all', this)">全部</button>
+            <button class="filter-chip" onclick="filterTl('scene', this)">场景</button>
+            <button class="filter-chip" onclick="filterTl('apply', this)">应用/回读</button>
+            <button class="filter-chip" onclick="filterTl('warn', this)">接管/异常</button>
+          </div>
+          <div class="timeline-list">
+            <div class="tl-item" data-kind="scene">
+              <div class="tl-time">00:41:18</div>
+              <div class="tl-axis"><span class="tl-dot good"></span><span class="tl-line"></span></div>
+              <div class="tl-card">
+                <div class="tl-head"><span>激活场景「游戏低延迟」</span><span class="pill pill-good">Applied</span></div>
+                <div class="tl-desc">命中进程 Cyberpunk2077.exe；写入 CPU CO 与调度规则，全部回读一致。</div>
+              </div>
+            </div>
+            <div class="tl-item" data-kind="warn">
+              <div class="tl-time">00:39:04</div>
+              <div class="tl-axis"><span class="tl-dot warn"></span><span class="tl-line"></span></div>
+              <div class="tl-card">
+                <div class="tl-head"><span>检测到外部修改 · 用户接管</span><span class="pill pill-warn">Takeover</span></div>
+                <div class="tl-desc">sched.9312.affinity (obs64.exe) 被外部改为 0xFF00，已暂停自动覆盖。</div>
+                <div class="tl-actions"><button class="btn" onclick="toast('已释放 obs64.exe 用户接管')">释放接管</button></div>
+              </div>
+            </div>
+            <div class="tl-item" data-kind="apply">
+              <div class="tl-time">00:35:50</div>
+              <div class="tl-axis"><span class="tl-dot"></span><span class="tl-line"></span></div>
+              <div class="tl-card">
+                <div class="tl-head"><span>电源策略写入部分跳过</span><span class="pill pill-warn">Partial</span></div>
+                <div class="tl-desc">EPP/Boost 已写入并重新激活；PCIe ASPM 受 BIOS 限制跳过。</div>
+              </div>
+            </div>
+            <div class="tl-item" data-kind="apply">
+              <div class="tl-time">00:30:12</div>
+              <div class="tl-axis"><span class="tl-dot good"></span></div>
+              <div class="tl-card">
+                <div class="tl-head"><span>服务启动自检完成</span><span class="pill pill-good">Ready</span></div>
+                <div class="tl-desc">Zentwik.Agent 已连接 · PawnIO RyzenSMU 就绪 · BootGuard 正常。</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Collapsible Right Ledger Inspector -->
+    <aside class="inspector collapsed" id="inspectorDrawer">
+      <div class="inspector-head">
+        <span>StateLedger 状态账本</span>
+        <button class="btn" onclick="document.getElementById('inspectorDrawer').classList.add('collapsed')">收起</button>
+      </div>
+      <div class="inspector-body">
+        <div class="ledger-row">
+          <div style="display:flex;justify-content:space-between;font-weight:600"><span>cpu.co.0</span><span class="pill pill-good">Scene</span></div>
+          <div class="section-sub">前值 0 → 目标 -25 → 实测 -25</div>
+        </div>
+        <div class="ledger-row">
+          <div style="display:flex;justify-content:space-between;font-weight:600"><span>sched.9312.affinity</span><span class="pill pill-warn">User</span></div>
+          <div class="section-sub">外部改为 0xFF00 · 自动化暂停</div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div class="toast hidden" id="toastEl"></div>
+
+<script>
+  function toast(msg) {
+    const el = document.getElementById('toastEl');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    clearTimeout(window._t);
+    window._t = setTimeout(() => el.classList.add('hidden'), 2400);
+  }
+
+  const pops = {
+    btnScenePop: 'pop-scene',
+    btnLedgerPop: 'pop-ledger',
+    btnAppearPop: 'pop-appear'
+  };
+
+  function closeAllPops() {
+    Object.keys(pops).forEach(btnId => {
+      document.getElementById(btnId).classList.remove('open');
+      document.getElementById(pops[btnId]).classList.add('hidden');
+    });
+  }
+
+  Object.entries(pops).forEach(([btnId, popId]) => {
+    document.getElementById(btnId).addEventListener('click', e => {
+      e.stopPropagation();
+      const pop = document.getElementById(popId);
+      const isOpen = !pop.classList.contains('hidden');
+      closeAllPops();
+      if (!isOpen) {
+        pop.classList.remove('hidden');
+        document.getElementById(btnId).classList.add('open');
+      }
+    });
+  });
+
+  document.querySelectorAll('.flyout').forEach(f => f.addEventListener('click', e => e.stopPropagation()));
+  document.addEventListener('click', closeAllPops);
+
+  function setDensity(d, btn) {
+    document.getElementById('win').dataset.density = d;
+    document.querySelectorAll('#densitySeg button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+
+  function setTheme(t, btn) {
+    document.getElementById('win').dataset.theme = t;
+    document.querySelectorAll('#themeSeg button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+
+  function setAccent(color, dot) {
+    document.documentElement.style.setProperty('--accent', color);
+    document.documentElement.style.setProperty('--accent-subtle', color + '24');
+    document.documentElement.style.setProperty('--accent-border', color + '73');
+    document.querySelectorAll('.accent-dot').forEach(d => d.classList.remove('active'));
+    if (dot) dot.classList.add('active');
+  }
+
+  function setScene(name, active, btn) {
+    document.querySelectorAll('#sceneSeg button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('popSceneBadge').textContent = name;
+    document.getElementById('popSceneBadge').className = active ? 'pill pill-good' : 'pill pill-muted';
+    document.getElementById('kpiSceneName').textContent = name;
+    document.getElementById('sceneDot').classList.toggle('hidden', !active);
+    toast(active ? `已切换到场景「${name}」` : '已停用活动场景并回退未接管字段');
+  }
+
+  function setConflict(label, btn) {
+    document.querySelectorAll('#conflictSeg button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    toast(`外部修改冲突策略已设为：${label}`);
+  }
+
+  function openInspector() {
+    closeAllPops();
+    document.getElementById('inspectorDrawer').classList.remove('collapsed');
+  }
+
+  function filterTl(kind, btn) {
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.tl-item').forEach(item => {
+      item.classList.toggle('hidden', kind !== 'all' && item.dataset.kind !== kind);
+    });
+  }
+</script>
+</body>
+</html>

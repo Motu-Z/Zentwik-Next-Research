@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Zentwik UI 原型 · Round 5 行内切换 + 多选 + 两层掩码库</title>
+<style>
+  :root {
+    --bg-window: #0d1015;
+    --bg-titlebar: #0a0c10;
+    --bg-rail: #12161e;
+    --bg-surface: #171c26;
+    --bg-surface-alt: #1e2430;
+    --bg-hover: #252d3d;
+    --border: #283042;
+    --border-strong: #3a465e;
+    --text-primary: #eef2f8;
+    --text-secondary: #9aa6bc;
+    --text-muted: #6c7890;
+    --accent: #3b82f6;
+    --accent-subtle: rgba(59, 130, 246, 0.16);
+    --accent-border: rgba(59, 130, 246, 0.55);
+    --good: #22c55e;
+    --good-subtle: rgba(34, 197, 94, 0.14);
+    --warn: #f59e0b;
+    --warn-subtle: rgba(245, 158, 11, 0.14);
+    --info: #38bdf8;
+    --info-subtle: rgba(56, 189, 248, 0.14);
+    --radius: 6px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg-window); color: var(--text-primary);
+    font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+    font-size: 13px; line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .proto-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    padding: 7px 16px; background: #111620; border-bottom: 1px solid var(--border);
+  }
+  .badge {
+    background: var(--accent-subtle); color: #93c5fd; border: 1px solid var(--accent-border);
+    padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
+  }
+  .sub { color: var(--text-secondary); font-size: 11.5px; }
+
+  .window-frame { height: calc(100vh - 36px); display: flex; flex-direction: column; }
+  .titlebar {
+    height: 36px; min-height: 36px; background: var(--bg-titlebar); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; padding-left: 12px;
+  }
+  .app-logo { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 12.5px; }
+  .dot-live { width: 7px; height: 7px; border-radius: 50%; background: var(--good); }
+  .sys-chip {
+    font-size: 11px; color: var(--text-secondary); padding: 1px 7px; border-radius: 4px;
+    background: var(--bg-surface); border: 1px solid var(--border);
+  }
+  .titlebar-right { display: flex; align-items: center; height: 100%; }
+  .tb-icon-btn, .cap-btn {
+    width: 40px; height: 100%; border: none; background: transparent; color: var(--text-secondary);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .cap-btn { width: 44px; }
+  .tb-icon-btn:hover, .cap-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .tb-icon-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.7; }
+  .cap-btn svg { width: 11px; height: 11px; stroke: currentColor; fill: none; stroke-width: 1.5; }
+
+  .workspace-body { flex: 1; min-height: 0; display: flex; }
+  .nav-rail {
+    width: 184px; min-width: 184px; background: var(--bg-rail); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; justify-content: space-between; padding: 8px;
+  }
+  .nav-group-label {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); padding: 8px 8px 4px;
+  }
+  .nav-item {
+    display: flex; align-items: center; justify-content: space-between; width: 100%;
+    border: none; background: transparent; color: var(--text-secondary); padding: 7px 10px;
+    border-radius: var(--radius); cursor: pointer; text-align: left; font-size: 13px; margin-bottom: 2px;
+  }
+  .nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .nav-item.active {
+    background: var(--accent-subtle); color: var(--text-primary); font-weight: 600; box-shadow: inset 2px 0 0 var(--accent);
+  }
+  .nav-tag { font-size: 10.5px; padding: 1px 5px; border-radius: 3px; background: var(--bg-surface-alt); color: var(--text-secondary); }
+  .nav-tag.good { background: var(--good-subtle); color: var(--good); }
+
+  .main-pane {
+    flex: 1; min-width: 0; overflow-y: auto; padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+
+  .preset-strip {
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+    padding: 9px 12px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
+  }
+  .btn {
+    height: 28px; padding: 0 10px; border-radius: var(--radius);
+    border: 1px solid var(--border-strong); background: var(--bg-surface-alt);
+    color: var(--text-primary); cursor: pointer; font-size: 12px; white-space: nowrap;
+  }
+  .btn:hover { background: var(--bg-hover); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .btn-sm { height: 23px; padding: 0 8px; font-size: 11px; }
+
+  .pill {
+    display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 3px;
+    font-size: 11px; font-weight: 600;
+  }
+  .pill-good { background: var(--good-subtle); color: var(--good); }
+  .pill-warn { background: var(--warn-subtle); color: var(--warn); }
+  .pill-info { background: var(--info-subtle); color: var(--info); }
+  .pill-muted { background: var(--bg-surface-alt); color: var(--text-secondary); }
+
+  select.flat-select, input.flat-input {
+    height: 28px; padding: 0 8px; border-radius: var(--radius);
+    background: var(--bg-surface-alt); border: 1px solid var(--border-strong);
+    color: var(--text-primary); font-size: 12px;
+  }
+  select.inline-sel {
+    height: 24px; padding: 0 6px; font-size: 11.5px; border-radius: 4px;
+    background: var(--bg-surface-alt); border: 1px solid var(--border);
+    color: var(--text-primary); max-width: 155px;
+  }
+  select.inline-sel:hover { border-color: var(--accent); }
+
+  .content-split { display: flex; gap: 12px; flex: 1; min-height: 0; align-items: stretch; }
+  .left-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  .right-drawer {
+    width: 330px; min-width: 330px;
+    background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .right-drawer.collapsed { display: none; }
+
+  .box {
+    background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+  }
+  .box-head {
+    padding: 8px 12px; background: var(--bg-surface-alt); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+  }
+
+  .seg {
+    display: inline-flex; background: var(--bg-surface-alt); border: 1px solid var(--border);
+    border-radius: 5px; padding: 2px; gap: 2px;
+  }
+  .seg button {
+    border: none; background: transparent; color: var(--text-secondary);
+    padding: 3px 9px; border-radius: 3px; cursor: pointer; font-size: 11.5px;
+  }
+  .seg button.active { background: var(--accent); color: #fff; font-weight: 600; }
+
+  /* Multi-select Batch Bar (appears only when >=2 processes checked) */
+  .batch-bar {
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+    padding: 7px 12px; background: var(--accent-subtle); border: 1px solid var(--accent-border);
+    border-radius: var(--radius);
+  }
+
+  .proc-table { width: 100%; border-collapse: collapse; }
+  .proc-table th, .proc-table td {
+    padding: 7px 9px; border-bottom: 1px solid var(--border); text-align: left; font-size: 12px; vertical-align: middle;
+  }
+  .proc-table th { color: var(--text-muted); font-size: 11px; font-weight: 600; background: var(--bg-surface-alt); }
+  .proc-table tr:hover td { background: var(--bg-hover); }
+  .proc-path {
+    font-size: 11px; color: var(--text-muted); max-width: 240px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .drawer-body { padding: 10px 12px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 8px; }
+  .item-card {
+    background: var(--bg-surface-alt); border: 1px solid var(--border); border-radius: 5px;
+    padding: 9px 10px; display: flex; flex-direction: column; gap: 4px;
+  }
+  .item-card:hover { border-color: var(--border-strong); }
+  .core-bit-grid {
+    display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 3px; margin-top: 6px;
+  }
+  .bit-btn {
+    height: 24px; border-radius: 3px; border: 1px solid var(--border);
+    background: var(--bg-surface-alt); color: var(--text-secondary);
+    cursor: pointer; font-size: 11px; font-weight: 600;
+  }
+  .bit-btn.on { background: var(--accent-subtle); border-color: var(--accent); color: var(--text-primary); }
+
+  .hidden { display: none !important; }
+  .toast {
+    position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+    background: #1e293b; color: #f8fafc; border: 1px solid var(--accent);
+    padding: 7px 14px; border-radius: 6px; font-size: 12px; z-index: 50;
+  }
+</style>
+</head>
+<body>
+
+<div class="proto-bar">
+  <div style="display:flex;align-items:center;gap:10px">
+    <span class="badge">Round 5 · 贴合手感版</span>
+    <strong>进程表：多选 + 搜索 + 进程路径 + 行内直接切换 + 状态/所有权 · 右侧：可收起的规则与两层钻取掩码库</strong>
+  </div>
+  <button class="btn btn-sm" id="toggleDrawerBtn" onclick="toggleDrawer()">收起右侧控制面板</button>
+</div>
+
+<div class="window-frame">
+  <header class="titlebar">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="app-logo"><span class="dot-live"></span>Zentwik</div>
+      <span class="sys-chip">Ryzen 9 9955HX · 16C/32T · CPU Sets 就绪</span>
+    </div>
+    <div class="titlebar-right">
+      <div style="display:flex;height:100%;border-right:1px solid var(--border)">
+        <button class="tb-icon-btn"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></button>
+        <button class="tb-icon-btn"><svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg></button>
+        <button class="tb-icon-btn"><svg viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="20" y1="21" x2="20" y2="16"/></svg></button>
+      </div>
+      <button class="cap-btn"><svg viewBox="0 0 12 12"><line x1="1" y1="6" x2="11" y2="6"/></svg></button>
+      <button class="cap-btn"><svg viewBox="0 0 12 12"><rect x="1.5" y="1.5" width="9" height="9"/></svg></button>
+      <button class="cap-btn"><svg viewBox="0 0 12 12"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg></button>
+    </div>
+  </header>
+
+  <div class="workspace-body">
+    <aside class="nav-rail">
+      <div>
+        <div class="nav-group-label">实时控制与监控</div>
+        <button class="nav-item"><span>首页总览</span></button>
+        <button class="nav-item"><span>CPU 调校</span></button>
+        <button class="nav-item"><span>电源管理</span></button>
+        <button class="nav-item active"><span>进程与调度</span><span class="nav-tag good">3 规则</span></button>
+        <div class="nav-group-label">编排与预设</div>
+        <button class="nav-item"><span>场景自动化</span></button>
+        <button class="nav-item"><span>方案库</span></button>
+      </div>
+      <div>
+        <div class="nav-group-label">系统</div>
+        <button class="nav-item"><span>能力与诊断</span></button>
+        <button class="nav-item"><span>系统设置</span></button>
+      </div>
+    </aside>
+
+    <main class="main-pane">
+      <!-- Top Live-First Strip -->
+      <div class="preset-strip">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span class="pill pill-good">SchedulingWatcher 1s 扫描</span>
+          <span class="sub">当前调度方案：</span>
+          <select class="flat-select">
+            <option>游戏 CCD0 隔离方案 (3 条规则)</option>
+            <option>直播推流分流方案</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="btn" onclick="toast('解绑全部由 Zentwik 管理的进程')">全部解绑</button>
+          <button class="btn btn-primary" onclick="toast('保存当前修改并下发调度规则')">保存并应用</button>
+        </div>
+      </div>
+
+      <div class="content-split">
+        <!-- LEFT: Multi-select + Search + Path + Inline Dropdowns + Ownership -->
+        <div class="left-main">
+          <!-- Batch Action Bar (Auto-shows when multiple rows checked) -->
+          <div class="batch-bar hidden" id="batchBar">
+            <div><strong id="batchCount">已选中 2 个进程</strong> <span class="sub">· 批量设置选中进程的目标掩码与优先级：</span></div>
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+              <select class="inline-sel" id="batchMask">
+                <option value="游戏核心 (CCD0)">游戏核心 (CCD0)</option>
+                <option value="后台/推流 (CCD1)">后台/推流 (CCD1)</option>
+                <option value="仅物理核">仅物理核</option>
+              </select>
+              <select class="inline-sel" id="batchPrio">
+                <option>EcoQoS</option><option>Normal</option><option>AboveNormal</option><option selected>High</option>
+              </select>
+              <button class="btn btn-primary btn-sm" onclick="applyBatch()">批量应用</button>
+              <button class="btn btn-sm" onclick="clearChecks()">取消多选</button>
+            </div>
+          </div>
+
+          <section class="box" style="flex:1">
+            <div class="box-head">
+              <div class="seg" id="procFilterSeg">
+                <button class="active" onclick="filterProcs('all', this)">全部 (5)</button>
+                <button onclick="filterProcs('managed', this)">已纳管 (3)</button>
+                <button onclick="filterProcs('takeover', this)">接管/异常 (1)</button>
+              </div>
+              <input class="flat-input" placeholder="搜索进程名或路径…" style="width:210px;height:26px" oninput="searchProcs(this.value)" />
+            </div>
+            <table class="proc-table">
+              <thead>
+                <tr>
+                  <th style="width:28px"><input type="checkbox" onclick="toggleAllChecks(this.checked)" /></th>
+                  <th>进程与位置</th>
+                  <th>CPU</th>
+                  <th>核心目标（行内切换）</th>
+                  <th>优先级（行内）</th>
+                  <th>状态 / 所有权</th>
+                </tr>
+              </thead>
+              <tbody id="procBody"></tbody>
+            </table>
+          </section>
+        </div>
+
+        <!-- RIGHT COLLAPSIBLE PANEL: Saved Rules & 2-Level Mask Library -->
+        <aside class="right-drawer" id="rightDrawer">
+          <div class="box-head">
+            <div class="seg" id="drawerTabSeg" style="width:100%;display:grid;grid-auto-flow:column">
+              <button class="active" onclick="switchDrawerTab('masks', this)">核心掩码库 (3/10)</button>
+              <button onclick="switchDrawerTab('rules', this)">已保存规则 (3)</button>
+            </div>
+          </div>
+
+          <!-- TAB 1 LEVEL 1: Clean Mask List -->
+          <div class="drawer-body" id="masks-list-view">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span class="sub">点击「进入编辑」修改掩码拓扑</span>
+              <button class="btn btn-primary btn-sm" onclick="openMaskEditor('新掩码 4')">+ 新建</button>
+            </div>
+            <div class="item-card">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <strong>游戏核心 (CCD0)</strong>
+                <span class="pill pill-info">1 处引用</span>
+              </div>
+              <div class="sub">CPU Sets · 0–7 (0x00FF)</div>
+              <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:2px">
+                <button class="btn btn-sm" onclick="openMaskEditor('游戏核心 (CCD0)')">进入编辑 →</button>
+              </div>
+            </div>
+            <div class="item-card">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <strong>后台/推流 (CCD1)</strong>
+                <span class="pill pill-muted">1 处引用</span>
+              </div>
+              <div class="sub">Affinity · 8–15 (0xFF00)</div>
+              <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:2px">
+                <button class="btn btn-sm" onclick="openMaskEditor('后台/推流 (CCD1)')">进入编辑 →</button>
+              </div>
+            </div>
+            <div class="item-card">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <strong>仅物理核</strong>
+                <span class="pill pill-muted">未引用</span>
+              </div>
+              <div class="sub">CPU Sets · 偶数线程 (0x5555)</div>
+              <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:2px">
+                <button class="btn btn-sm" onclick="openMaskEditor('仅物理核')">进入编辑 →</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 1 LEVEL 2: Entered Mask Editor (Clean Drill-Down!) -->
+          <div class="drawer-body hidden" id="masks-edit-view">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:6px;border-bottom:1px solid var(--border)">
+              <button class="btn btn-sm" onclick="closeMaskEditor()">← 返回掩码库</button>
+              <strong id="editMaskTitle">游戏核心 (CCD0)</strong>
+            </div>
+            <div>
+              <div class="sub" style="margin-bottom:4px">掩码名称</div>
+              <input class="flat-input" id="editMaskName" value="游戏核心 (CCD0)" style="width:100%" />
+            </div>
+            <div>
+              <div class="sub" style="margin-bottom:4px">默认执行方式</div>
+              <select class="flat-select" style="width:100%">
+                <option>CPU Sets（软约束 · 支持跨组）</option>
+                <option>Affinity Mask（硬绑定 · ≤64 线程）</option>
+              </select>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span class="sub">逻辑核心选择 (0–15)</span>
+                <div style="display:flex;gap:4px">
+                  <button class="btn btn-sm" onclick="setBits(0,7)">CCD0</button>
+                  <button class="btn btn-sm" onclick="setBits(8,15)">CCD1</button>
+                </div>
+              </div>
+              <div class="core-bit-grid" id="maskEditGrid"></div>
+              <div class="sub" style="margin-top:6px">128 位掩码：<code id="maskHex">0x00FF</code></div>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:auto;padding-top:8px;border-top:1px solid var(--border)">
+              <button class="btn btn-sm" onclick="toast('查看引用此掩码的规则与进程')">使用位置</button>
+              <button class="btn btn-primary btn-sm" onclick="closeMaskEditor(); toast('已保存掩码并同步更新引用规则')">保存掩码</button>
+            </div>
+          </div>
+
+          <!-- TAB 2: Saved Rules -->
+          <div class="drawer-body hidden" id="rules-view">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span class="sub">包含未启动进程的持久规则</span>
+              <button class="btn btn-primary btn-sm" onclick="toast('新建持久规则')">+ 新建规则</button>
+            </div>
+            <div class="item-card">
+              <div style="display:flex;justify-content:space-between"><strong>Cyberpunk2077.exe</strong><span class="pill pill-good">已对齐</span></div>
+              <div class="sub">游戏核心 (CCD0) · High · Enforce</div>
+            </div>
+            <div class="item-card">
+              <div style="display:flex;justify-content:space-between"><strong>obs64.exe</strong><span class="pill pill-warn">用户接管</span></div>
+              <div class="sub">后台/推流 (CCD1) · AboveNormal</div>
+            </div>
+            <div class="item-card">
+              <div style="display:flex;justify-content:space-between"><strong>Valorant-Win64-Shipping.exe</strong><span class="pill pill-muted">未运行</span></div>
+              <div class="sub">游戏核心 (CCD0) · High · Enforce</div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="toast hidden" id="toastEl"></div>
+
+<script>
+  const procs = [
+    { name: 'Cyberpunk2077.exe', pid: 14820, path: 'D:\\Games\\Cyberpunk 2077\\bin\\x64\\Cyberpunk2077.exe', cpu: '24.1%', prio: 'High', mask: '游戏核心 (CCD0)', status: 'aligned', label: '已对齐' },
+    { name: 'obs64.exe', pid: 9312, path: 'C:\\Program Files\\obs-studio\\bin\\64bit\\obs64.exe', cpu: '6.8%', prio: 'AboveNormal', mask: '后台/推流 (CCD1)', status: 'takeover', label: '用户接管' },
+    { name: 'blender.exe', pid: 18240, path: 'C:\\Program Files\\Blender Foundation\\Blender 4.2\\blender.exe', cpu: '48.3%', prio: 'Normal', mask: '系统默认', status: 'none', label: '未纳管' },
+    { name: 'chrome.exe', pid: 4120, path: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', cpu: '2.4%', prio: 'Normal', mask: '系统默认', status: 'none', label: '未纳管' },
+    { name: 'Code.exe', pid: 7740, path: 'C:\\Users\\Motu\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe', cpu: '1.9%', prio: 'Normal', mask: '系统默认', status: 'none', label: '未纳管' }
+  ];
+  const checked = new Set();
+  let filterMode = 'all';
+  let searchQ = '';
+  const maskBits = new Set([0,1,2,3,4,5,6,7]);
+
+  function renderProcs() {
+    const body = document.getElementById('procBody');
+    body.innerHTML = '';
+    procs.forEach((p, idx) => {
+      if (filterMode === 'managed' && p.status === 'none') return;
+      if (filterMode === 'takeover' && p.status !== 'takeover') return;
+      if (searchQ && !p.name.toLowerCase().includes(searchQ) && !p.path.toLowerCase().includes(searchQ)) return;
+
+      const tr = document.createElement('tr');
+      const pillCls = p.status === 'aligned' ? 'pill-good' : p.status === 'takeover' ? 'pill-warn' : 'pill-muted';
+      const masks = ['系统默认', '游戏核心 (CCD0)', '后台/推流 (CCD1)', '仅物理核'];
+      const prios = ['EcoQoS', 'BelowNormal', 'Normal', 'AboveNormal', 'High'];
+
+      tr.innerHTML = `
+        <td><input type="checkbox" ${checked.has(idx)?'checked':''} onchange="toggleCheck(${idx}, this.checked)" /></td>
+        <td>
+          <div><strong>${p.name}</strong> <span class="sub">PID ${p.pid}</span></div>
+          <div class="proc-path" title="${p.path}">${p.path}</div>
+        </td>
+        <td>${p.cpu}</td>
+        <td>
+          <select class="inline-sel" onchange="inlineMask(${idx}, this.value)">
+            ${masks.map(m => `<option ${p.mask===m?'selected':''}>${m}</option>`).join('')}
+          </select>
+        </td>
+        <td>
+          <select class="inline-sel" onchange="inlinePrio(${idx}, this.value)">
+            ${prios.map(pr => `<option ${p.prio===pr?'selected':''}>${pr}</option>`).join('')}
+          </select>
+        </td>
+        <td>
+          <div style="display:flex;align-items:center;gap:4px">
+            <span class="pill ${pillCls}">${p.label}</span>
+            ${p.status==='takeover' ? `<button class="btn btn-sm" onclick="releaseRow(${idx})">释放</button>` : ''}
+          </div>
+        </td>
+      `;
+      body.appendChild(tr);
+    });
+    updateBatchBar();
+  }
+
+  function toggleCheck(idx, on) { on ? checked.add(idx) : checked.delete(idx); updateBatchBar(); }
+  function toggleAllChecks(on) {
+    checked.clear();
+    if (on) procs.forEach((_, i) => checked.add(i));
+    renderProcs();
+  }
+  function clearChecks() { checked.clear(); renderProcs(); }
+  function updateBatchBar() {
+    const bar = document.getElementById('batchBar');
+    bar.classList.toggle('hidden', checked.size < 2);
+    document.getElementById('batchCount').textContent = `已选中 ${checked.size} 个进程`;
+  }
+  function applyBatch() {
+    const m = document.getElementById('batchMask').value;
+    const pr = document.getElementById('batchPrio').value;
+    checked.forEach(i => { procs[i].mask = m; procs[i].prio = pr; procs[i].status = 'aligned'; procs[i].label = '已对齐'; });
+    toast(`已为 ${checked.size} 个选中进程应用「${m}」与 ${pr}`);
+    renderProcs();
+  }
+  function inlineMask(i, v) {
+    procs[i].mask = v;
+    procs[i].status = v === '系统默认' ? 'none' : 'aligned';
+    procs[i].label = v === '系统默认' ? '未纳管' : '已对齐';
+    renderProcs();
+    toast(`${procs[i].name} 行内切换掩码 → ${v}`);
+  }
+  function inlinePrio(i, v) {
+    procs[i].prio = v;
+    toast(`${procs[i].name} 行内切换优先级 → ${v}`);
+  }
+  function releaseRow(i) {
+    procs[i].status = 'aligned'; procs[i].label = '已对齐';
+    renderProcs();
+    toast(`已释放 ${procs[i].name} 用户接管`);
+  }
+
+  function switchDrawerTab(tab, btn) {
+    document.querySelectorAll('#drawerTabSeg button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('masks-list-view').classList.toggle('hidden', tab !== 'masks');
+    document.getElementById('masks-edit-view').classList.add('hidden');
+    document.getElementById('rules-view').classList.toggle('hidden', tab !== 'rules');
+  }
+  function openMaskEditor(name) {
+    document.getElementById('masks-list-view').classList.add('hidden');
+    document.getElementById('masks-edit-view').classList.remove('hidden');
+    document.getElementById('editMaskTitle').textContent = name;
+    document.getElementById('editMaskName').value = name;
+    renderMaskBits();
+  }
+  function closeMaskEditor() {
+    document.getElementById('masks-edit-view').classList.add('hidden');
+    document.getElementById('masks-list-view').classList.remove('hidden');
+  }
+  function setBits(a, b) {
+    maskBits.clear();
+    for (let i = a; i <= b; i++) maskBits.add(i);
+    renderMaskBits();
+  }
+  function renderMaskBits() {
+    const g = document.getElementById('maskEditGrid'); g.innerHTML = '';
+    let hex = 0;
+    for (let i = 0; i < 16; i++) {
+      if (maskBits.has(i)) hex |= (1 << i);
+      const b = document.createElement('button');
+      b.className = 'bit-btn' + (maskBits.has(i) ? ' on' : '');
+      b.textContent = i;
+      b.onclick = () => { maskBits.has(i) ? maskBits.delete(i) : maskBits.add(i); renderMaskBits(); };
+      g.appendChild(b);
+    }
+    document.getElementById('maskHex').textContent = '0x' + hex.toString(16).toUpperCase().padStart(4, '0');
+  }
+
+  function toggleDrawer() {
+    const d = document.getElementById('rightDrawer');
+    d.classList.toggle('collapsed');
+    document.getElementById('toggleDrawerBtn').textContent = d.classList.contains('collapsed') ? '展开右侧控制面板' : '收起右侧控制面板';
+  }
+  function filterProcs(m, btn) {
+    filterMode = m;
+    document.querySelectorAll('#procFilterSeg button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderProcs();
+  }
+  function searchProcs(q) { searchQ = q.trim().toLowerCase(); renderProcs(); }
+  function toast(msg) {
+    const el = document.getElementById('toastEl');
+    el.textContent = msg; el.classList.remove('hidden');
+    clearTimeout(window._t); window._t = setTimeout(() => el.classList.add('hidden'), 2200);
+  }
+
+  renderProcs();
+</script>
+</body>
+</html>

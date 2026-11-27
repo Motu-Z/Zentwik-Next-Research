@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Zentwik UI 原型 · Round 2 全局框架与「先改后存」交互</title>
+<style>
+  :root {
+    --bg-window: #0d1015;
+    --bg-rail: #12161e;
+    --bg-surface: #171c26;
+    --bg-surface-alt: #1e2430;
+    --bg-hover: #242b3a;
+    --border: #283042;
+    --border-strong: #37435a;
+    --text-primary: #eef2f8;
+    --text-secondary: #9aa6bc;
+    --text-muted: #6c7890;
+    --accent: #3b82f6;
+    --accent-subtle: rgba(59, 130, 246, 0.14);
+    --accent-border: rgba(59, 130, 246, 0.45);
+    --good: #22c55e;
+    --good-subtle: rgba(34, 197, 94, 0.14);
+    --warn: #f59e0b;
+    --warn-subtle: rgba(245, 158, 11, 0.14);
+    --bad: #ef4444;
+    --bad-subtle: rgba(239, 68, 68, 0.14);
+    --info: #38bdf8;
+    --info-subtle: rgba(56, 189, 248, 0.14);
+
+    --pad-panel: 16px;
+    --pad-cell: 10px 12px;
+    --gap: 12px;
+    --font-size: 13px;
+    --row-h: 34px;
+    --radius: 6px;
+  }
+
+  [data-theme="light"] {
+    --bg-window: #f3f5f8;
+    --bg-rail: #e9edf3;
+    --bg-surface: #ffffff;
+    --bg-surface-alt: #f6f8fb;
+    --bg-hover: #eef2f7;
+    --border: #dce2ec;
+    --border-strong: #c4cedd;
+    --text-primary: #141923;
+    --text-secondary: #4e5b70;
+    --text-muted: #7a879c;
+    --accent-subtle: rgba(59, 130, 246, 0.10);
+    --good-subtle: rgba(22, 163, 74, 0.10);
+    --warn-subtle: rgba(217, 119, 6, 0.10);
+    --bad-subtle: rgba(220, 38, 38, 0.10);
+    --info-subtle: rgba(2, 132, 199, 0.10);
+  }
+
+  [data-density="compact"] {
+    --pad-panel: 10px;
+    --pad-cell: 6px 9px;
+    --gap: 8px;
+    --font-size: 12px;
+    --row-h: 28px;
+    --radius: 4px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #080a0e;
+    color: var(--text-primary);
+    font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+    font-size: var(--font-size);
+    line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Prototype Banner */
+  .proto-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; padding: 8px 14px;
+    background: #11151d; border-bottom: 1px solid #262e3e;
+    color: #cbd5e1; font-size: 12px; flex-wrap: wrap;
+  }
+  .proto-toolbar .left { display: flex; align-items: center; gap: 10px; }
+  .proto-badge {
+    background: rgba(59,130,246,0.18); color: #93c5fd;
+    border: 1px solid rgba(59,130,246,0.4);
+    padding: 2px 8px; border-radius: 999px; font-weight: 600; font-size: 11px;
+  }
+  .proto-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .seg {
+    display: inline-flex; background: #1a202c; border: 1px solid #2d3748;
+    border-radius: 5px; padding: 2px; gap: 2px;
+  }
+  .seg button {
+    border: none; background: transparent; color: #94a3b8;
+    padding: 3px 9px; border-radius: 3px; cursor: pointer; font-size: 11.5px;
+  }
+  .seg button.active {
+    background: var(--accent); color: #fff; font-weight: 600;
+  }
+  .accent-dot {
+    width: 14px; height: 14px; border-radius: 50%; border: 2px solid transparent;
+    cursor: pointer; padding: 0;
+  }
+  .accent-dot.active { border-color: #fff; transform: scale(1.1); }
+
+  /* App Frame */
+  .app-shell {
+    height: calc(100vh - 42px);
+    display: flex; flex-direction: column;
+    background: var(--bg-window);
+    color: var(--text-primary);
+  }
+
+  /* Top System Context Bar */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 12px; height: 40px; min-height: 40px;
+    background: var(--bg-rail);
+    border-bottom: 1px solid var(--border);
+    gap: 12px;
+  }
+  .topbar-left, .topbar-right { display: flex; align-items: center; gap: 10px; }
+  .brand { font-weight: 700; letter-spacing: 0.3px; font-size: 13.5px; display: flex; align-items: center; gap: 7px; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); display: inline-block; }
+  .hw-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 2px 8px; border-radius: var(--radius);
+    background: var(--bg-surface); border: 1px solid var(--border);
+    color: var(--text-secondary); font-size: 11.5px;
+  }
+  .scene-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 3px 10px; border-radius: var(--radius);
+    background: var(--accent-subtle); border: 1px solid var(--accent-border);
+    color: var(--text-primary); font-size: 12px;
+  }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+    height: 28px; padding: 0 10px; border-radius: var(--radius);
+    border: 1px solid var(--border-strong); background: var(--bg-surface);
+    color: var(--text-primary); cursor: pointer; font-size: 12px; white-space: nowrap;
+  }
+  .btn:hover { background: var(--bg-hover); }
+  .btn-primary {
+    background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600;
+  }
+  .btn-primary:hover { filter: brightness(1.08); background: var(--accent); }
+  .btn-ghost { background: transparent; border-color: transparent; color: var(--text-secondary); }
+  .btn-ghost:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .btn-sm { height: 24px; padding: 0 8px; font-size: 11.5px; }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  /* Main Body */
+  .workspace-body {
+    flex: 1; min-height: 0; display: flex;
+  }
+
+  /* Left Navigation Rail (Mode C1) */
+  .nav-rail {
+    width: 184px; min-width: 184px;
+    background: var(--bg-rail);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 8px;
+  }
+  [data-density="compact"] .nav-rail { width: 164px; min-width: 164px; padding: 6px; }
+  .nav-group-label {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.6px;
+    color: var(--text-muted); padding: 8px 8px 4px;
+  }
+  .nav-item {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%; border: none; background: transparent;
+    color: var(--text-secondary); padding: 7px 10px;
+    border-radius: var(--radius); cursor: pointer; text-align: left;
+    font-size: var(--font-size); margin-bottom: 2px;
+  }
+  .nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .nav-item.active {
+    background: var(--accent-subtle); color: var(--text-primary);
+    font-weight: 600; box-shadow: inset 2px 0 0 var(--accent);
+  }
+  .nav-tag {
+    font-size: 10.5px; padding: 1px 5px; border-radius: 3px;
+    background: var(--bg-surface-alt); color: var(--text-secondary);
+  }
+  .nav-tag.warn { background: var(--warn-subtle); color: var(--warn); }
+  .nav-tag.good { background: var(--good-subtle); color: var(--good); }
+
+  /* Mode C2 Top Sub-Nav (when C2 selected) */
+  .c2-modebar {
+    display: none; align-items: center; justify-content: space-between;
+    padding: 6px 14px; background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .c2-modebar.visible { display: flex; }
+  .tabs { display: flex; gap: 4px; }
+  .tab {
+    border: none; background: transparent; color: var(--text-secondary);
+    padding: 5px 11px; border-radius: var(--radius); cursor: pointer; font-size: 12.5px;
+  }
+  .tab:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .tab.active { background: var(--accent-subtle); color: var(--text-primary); font-weight: 600; }
+
+  /* Center Content */
+  .main-pane {
+    flex: 1; min-width: 0; overflow-y: auto;
+    padding: var(--pad-panel);
+    display: flex; flex-direction: column; gap: var(--gap);
+  }
+
+  /* Preset / Live-Edit Action Strip ("先改后存" 核心条) */
+  .preset-strip {
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+    gap: 10px; padding: var(--pad-cell);
+    background: var(--bg-surface); border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .preset-strip.dirty {
+    border-color: var(--warn);
+    background: linear-gradient(90deg, var(--warn-subtle) 0%, var(--bg-surface) 35%);
+  }
+  .preset-left, .preset-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  select.flat-select, input.flat-input {
+    height: 28px; padding: 0 8px; border-radius: var(--radius);
+    background: var(--bg-surface-alt); border: 1px solid var(--border-strong);
+    color: var(--text-primary); font-size: 12px;
+  }
+
+  /* Semantic Pills */
+  .pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 7px; border-radius: 3px; font-size: 11px; font-weight: 600;
+  }
+  .pill-good { background: var(--good-subtle); color: var(--good); }
+  .pill-warn { background: var(--warn-subtle); color: var(--warn); }
+  .pill-bad { background: var(--bad-subtle); color: var(--bad); }
+  .pill-info { background: var(--info-subtle); color: var(--info); }
+  .pill-muted { background: var(--bg-surface-alt); color: var(--text-secondary); }
+
+  /* Panels & Tables (Low-chrome, high density) */
+  .section-box {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .section-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: var(--pad-cell);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-surface-alt);
+  }
+  .section-title { font-weight: 600; font-size: var(--font-size); }
+  .section-sub { color: var(--text-secondary); font-size: 11.5px; }
+
+  /* Metrics Grid */
+  .kpi-row {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--gap);
+  }
+  .kpi-cell {
+    background: var(--bg-surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: var(--pad-cell);
+  }
+  .kpi-label { color: var(--text-secondary); font-size: 11.5px; }
+  .kpi-val { font-size: 20px; font-weight: 700; margin-top: 2px; }
+  [data-density="compact"] .kpi-val { font-size: 17px; }
+  .kpi-meta { color: var(--text-muted); font-size: 11px; margin-top: 2px; }
+
+  /* Layer CO Editor */
+  .layer-bar {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-bottom: 1px solid var(--border);
+  }
+  .layer-item {
+    padding: var(--pad-cell); border-right: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .layer-item:last-child { border-right: none; }
+  .stepper { display: inline-flex; align-items: center; gap: 4px; }
+  .stepper button {
+    width: 24px; height: 24px; border-radius: 4px;
+    border: 1px solid var(--border-strong); background: var(--bg-surface-alt);
+    color: var(--text-primary); cursor: pointer; font-weight: 700;
+  }
+  .stepper button:hover { background: var(--bg-hover); }
+  .stepper span { min-width: 34px; text-align: center; font-weight: 700; }
+
+  .ccd-grid {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap);
+    padding: var(--pad-panel);
+  }
+  .ccd-block {
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--bg-surface-alt); overflow: hidden;
+  }
+  .ccd-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 7px 10px; border-bottom: 1px solid var(--border);
+    font-weight: 600; font-size: 12px;
+  }
+  .core-table { width: 100%; border-collapse: collapse; }
+  .core-table th, .core-table td {
+    padding: 5px 10px; border-bottom: 1px solid var(--border);
+    text-align: left; font-size: 12px;
+  }
+  .core-table tr:last-child td { border-bottom: none; }
+  .core-table th { color: var(--text-muted); font-weight: 600; font-size: 11px; }
+
+  /* Data Table */
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th, .data-table td {
+    padding: var(--pad-cell); border-bottom: 1px solid var(--border);
+    text-align: left;
+  }
+  .data-table th {
+    color: var(--text-muted); font-weight: 600; font-size: 11.5px;
+    background: var(--bg-surface-alt);
+  }
+  .data-table tr:hover td { background: var(--bg-hover); }
+
+  /* Right Collapsible Inspector Drawer (StateLedger) */
+  .inspector {
+    width: 310px; min-width: 310px;
+    background: var(--bg-rail);
+    border-left: 1px solid var(--border);
+    display: flex; flex-direction: column;
+  }
+  .inspector.collapsed { display: none; }
+  .inspector-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px; border-bottom: 1px solid var(--border);
+    font-weight: 600;
+  }
+  .inspector-body {
+    flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .ledger-row {
+    background: var(--bg-surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 8px 10px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .ledger-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .ledger-target { font-family: Consolas, monospace; font-size: 11.5px; font-weight: 600; }
+  .ledger-vals { color: var(--text-secondary); font-size: 11.5px; }
+
+  /* Chart SVG */
+  .chart-wrap { padding: 10px 12px; height: 150px; }
+  [data-density="compact"] .chart-wrap { height: 118px; }
+  svg.spark { width: 100%; height: 100%; display: block; }
+
+  .hidden { display: none !important; }
+  .toast {
+    position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+    background: #1e293b; color: #f8fafc; border: 1px solid var(--accent);
+    padding: 7px 14px; border-radius: 6px; font-size: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.45); z-index: 50;
+  }
+</style>
+</head>
+<body>
+
+<div class="proto-toolbar">
+  <div class="left">
+    <span class="proto-badge">Round 2 探索原型 · 非终稿</span>
+    <span>重点验证：<strong>「先直接改实时参数，再决定是否保存方案」</strong> + <strong>全局框架对比 (C1 vs C2)</strong></span>
+  </div>
+  <div class="proto-controls">
+    <span>架构：</span>
+    <div class="seg" id="archSeg">
+      <button class="active" data-arch="c1">C1 领域直改工作台</button>
+      <button data-arch="c2">C2 三入口极简壳</button>
+    </div>
+    <span>密度：</span>
+    <div class="seg" id="densitySeg">
+      <button class="active" data-density="standard">标准</button>
+      <button data-density="compact">紧凑</button>
+    </div>
+    <span>主题：</span>
+    <div class="seg" id="themeSeg">
+      <button class="active" data-theme="dark">深色</button>
+      <button data-theme="light">浅色</button>
+    </div>
+    <span>强调色：</span>
+    <button class="accent-dot active" style="background:#3b82f6" data-accent="#3b82f6" title="Blue"></button>
+    <button class="accent-dot" style="background:#8b5cf6" data-accent="#8b5cf6" title="Violet"></button>
+    <button class="accent-dot" style="background:#14b8a6" data-accent="#14b8a6" title="Teal"></button>
+    <button class="accent-dot" style="background:#f59e0b" data-accent="#f59e0b" title="Amber"></button>
+  </div>
+</div>
+
+<div class="app-shell" id="appShell" data-theme="dark" data-density="standard">
+  <!-- Global Context Topbar -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="brand"><span class="status-dot"></span>Zentwik</div>
+      <span class="hw-chip">Ryzen 9 9955HX · 16C/32T · AC 供电</span>
+      <span class="hw-chip" id="capabilityChip">SMU 就绪 · Power 就绪 · CPU Sets 就绪</span>
+    </div>
+    <div class="topbar-right">
+      <div class="scene-pill" id="scenePill">
+        <span>活动场景：<strong>游戏低延迟</strong> (P10)</span>
+        <button class="btn btn-sm" id="toggleSceneBtn">停用</button>
+      </div>
+      <button class="btn" id="toggleInspectorBtn">账本检查器 (<span id="ledgerCount">4</span>)</button>
+    </div>
+  </header>
+
+  <!-- C2 Mode Top Sub-navigation (Only shown in C2) -->
+  <div class="c2-modebar" id="c2Bar">
+    <div class="tabs" id="c2TopTabs">
+      <button class="tab active" data-c2group="live">实时控制台 (Live)</button>
+      <button class="tab" data-c2group="automation">方案库与场景</button>
+      <button class="tab" data-c2group="system">诊断与设置</button>
+    </div>
+    <div class="tabs" id="c2SubTabs">
+      <button class="tab active" data-page="overview">监控总览</button>
+      <button class="tab" data-page="cpu">CPU 调校</button>
+      <button class="tab" data-page="power">电源策略</button>
+      <button class="tab" data-page="process">进程与调度</button>
+    </div>
+  </div>
+
+  <div class="workspace-body">
+    <!-- C1 Left Navigation Rail -->
+    <aside class="nav-rail" id="c1Rail">
+      <div>
+        <div class="nav-group-label">实时控制与监控</div>
+        <button class="nav-item" data-page="overview"><span>监控总览</span><span class="nav-tag good">10Hz</span></button>
+        <button class="nav-item active" data-page="cpu"><span>CPU 调校</span><span class="nav-tag warn" id="cpuDirtyTag">已改</span></button>
+        <button class="nav-item" data-page="power"><span>电源管理</span><span class="nav-tag">AC/DC</span></button>
+        <button class="nav-item" data-page="process"><span>进程与调度</span><span class="nav-tag">2 规则</span></button>
+
+        <div class="nav-group-label">编排与预设</div>
+        <button class="nav-item" data-page="scenes"><span>场景自动化</span><span class="nav-tag good">运行中</span></button>
+        <button class="nav-item" data-page="plans"><span>方案库</span><span class="nav-tag">6</span></button>
+      </div>
+      <div>
+        <div class="nav-group-label">系统</div>
+        <button class="nav-item" data-page="diagnostics"><span>能力与诊断</span></button>
+        <button class="nav-item" data-page="settings"><span>系统设置</span></button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-pane" id="mainPane">
+
+      <!-- PAGE: CPU TUNING (Live-First + Save as Plan) -->
+      <section id="page-cpu" class="page-view">
+        <div class="preset-strip dirty" id="cpuPresetStrip">
+          <div class="preset-left">
+            <span class="pill pill-good">AMD SMU 固件持久</span>
+            <span style="color:var(--text-secondary)">当前基线参考：</span>
+            <select class="flat-select" id="cpuPresetSelect">
+              <option value="gaming-co">方案：游戏负压 (-20 / CCD0 -25)</option>
+              <option value="stock">出厂默认 (0 / Auto)</option>
+              <option value="silent">静音降频 (-15 / FMax 5050)</option>
+            </select>
+            <span class="pill pill-warn" id="cpuDirtyBadge">已偏离参考方案 2 项（未保存）</span>
+          </div>
+          <div class="preset-right">
+            <button class="btn" id="btnResetCpu">还原参考值</button>
+            <button class="btn" id="btnSaveAsPlan">另存为新方案…</button>
+            <button class="btn btn-primary" id="btnApplyCpu">应用到硬件并回读</button>
+          </div>
+        </div>
+
+        <div class="section-box" style="margin-top:var(--gap)">
+          <div class="section-head">
+            <div>
+              <div class="section-title">Curve Optimizer 分层调校（实时直改）</div>
+              <div class="section-sub">优先级：单核覆盖 / Auto &gt; CCD 默认 &gt; 全局默认 · 写入后立即逐核回读校验</div>
+            </div>
+            <span class="pill pill-info">当前可写区间：-50 .. +50</span>
+          </div>
+
+          <div class="layer-bar">
+            <div class="layer-item">
+              <div>
+                <div style="font-weight:600">全局默认 (Default)</div>
+                <div class="section-sub">未单独指定的核继承此值</div>
+              </div>
+              <div class="stepper">
+                <button onclick="adjDefault(-5)">-</button>
+                <span id="valDefault">-15</span>
+                <button onclick="adjDefault(5)">+</button>
+              </div>
+            </div>
+            <div class="layer-item">
+              <div>
+                <div style="font-weight:600">CCD0 / CCD1 分层</div>
+                <div class="section-sub">CCD0: <strong id="valCcd0">-25</strong> · CCD1: <strong id="valCcd1">继承(-15)</strong></div>
+              </div>
+              <div class="stepper">
+                <button onclick="adjCcd0(-5)">-</button>
+                <span id="valCcd0Btn">-25</span>
+                <button onclick="adjCcd0(5)">+</button>
+              </div>
+            </div>
+            <div class="layer-item">
+              <div>
+                <div style="font-weight:600">FMax 频率上限</div>
+                <div class="section-sub">实测回读：<strong id="valFmaxActual">5450 MHz</strong></div>
+              </div>
+              <div class="stepper">
+                <button onclick="adjFmax(-25)">-</button>
+                <span id="valFmax">5450</span>
+                <button onclick="adjFmax(25)">+</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="ccd-grid">
+            <div class="ccd-block">
+              <div class="ccd-head">
+                <span>CCD 0 · 物理核 0–3（当前编辑）</span>
+                <span class="pill pill-muted">L3 共享域 #0</span>
+              </div>
+              <table class="core-table">
+                <thead><tr><th>核心</th><th>目标 CO</th><th>硬件回读</th><th>来源 / 所有权</th></tr></thead>
+                <tbody id="ccd0Rows"></tbody>
+              </table>
+            </div>
+            <div class="ccd-block">
+              <div class="ccd-head">
+                <span>CCD 1 · 物理核 4–7（继承全局）</span>
+                <span class="pill pill-muted">L3 共享域 #1</span>
+              </div>
+              <table class="core-table">
+                <thead><tr><th>核心</th><th>目标 CO</th><th>硬件回读</th><th>来源 / 所有权</th></tr></thead>
+                <tbody id="ccd1Rows"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PAGE: OVERVIEW / LIVE MONITOR -->
+      <section id="page-overview" class="page-view hidden">
+        <div class="kpi-row">
+          <div class="kpi-cell"><div class="kpi-label">CPU 总负载 / 封装温度</div><div class="kpi-val">34% · 62°C</div><div class="kpi-meta">有效采样 10Hz · 新鲜</div></div>
+          <div class="kpi-cell"><div class="kpi-label">GPU 负载 / 温度</div><div class="kpi-val">58% · 67°C</div><div class="kpi-meta">RTX 5070 Ti · 2410 MHz</div></div>
+          <div class="kpi-cell"><div class="kpi-label">内存占用</div><div class="kpi-val">18.4 / 31.2 GB</div><div class="kpi-meta">59% · 正常</div></div>
+          <div class="kpi-cell"><div class="kpi-label">当前活动方案摘要</div><div class="kpi-val" style="font-size:14px;margin-top:6px">CPU: 游戏负压 · Power: 卓越</div><div class="kpi-meta">场景「游戏低延迟」仲裁中</div></div>
+        </div>
+        <div class="section-box">
+          <div class="section-head">
+            <div><div class="section-title">CPU / 频率 / 温度实时曲线</div><div class="section-sub">数据面 10Hz 聚合 · 渲染面 30Hz（自绘 StreamGeometry 示意）</div></div>
+            <span class="pill pill-good">数据新鲜 (42ms 前)</span>
+          </div>
+          <div class="chart-wrap">
+            <svg class="spark" viewBox="0 0 800 120" preserveAspectRatio="none">
+              <polyline fill="none" stroke="var(--accent)" stroke-width="2" points="0,85 60,72 120,76 180,55 240,62 300,48 360,52 420,40 480,45 540,38 600,50 660,44 720,41 800,36"/>
+              <polyline fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4,3" points="0,95 60,92 120,88 180,82 240,84 300,76 360,78 420,70 480,72 540,68 600,74 660,70 720,69 800,66"/>
+            </svg>
+          </div>
+        </div>
+      </section>
+
+      <!-- PAGE: POWER -->
+      <section id="page-power" class="page-view hidden">
+        <div class="preset-strip">
+          <div class="preset-left">
+            <span class="pill pill-info">当前系统计划：高性能 (Zentwik 派生)</span>
+            <span style="color:var(--text-secondary)">AC/DC 策略直接修改后重新激活生效</span>
+          </div>
+          <div class="preset-right">
+            <button class="btn">另存为电源方案…</button>
+            <button class="btn btn-primary">写入并激活</button>
+          </div>
+        </div>
+        <div class="section-box">
+          <div class="section-head"><div class="section-title">AC / DC 电源策略矩阵</div><span class="pill pill-good">逐项支持状态已探测</span></div>
+          <table class="data-table">
+            <thead><tr><th>策略项</th><th>AC（插电）</th><th>DC（电池）</th><th>硬件支持</th></tr></thead>
+            <tbody>
+              <tr><td>处理器性能提升模式 (Boost)</td><td>Efficient Aggressive</td><td>Disabled</td><td><span class="pill pill-good">支持</span></td></tr>
+              <tr><td>能源性能首选项 (EPP)</td><td>20%</td><td>70%</td><td><span class="pill pill-good">支持</span></td></tr>
+              <tr><td>最大 / 最小处理器状态</td><td>100% / 5%</td><td>80% / 5%</td><td><span class="pill pill-good">支持</span></td></tr>
+              <tr><td>核心停泊最小核心数</td><td>100%</td><td>25%</td><td><span class="pill pill-good">支持</span></td></tr>
+              <tr><td>PCIe ASPM 链接电源管理</td><td>关闭</td><td>最大省电</td><td><span class="pill pill-warn">受 BIOS 限制</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- PAGE: PROCESS & SCHEDULING -->
+      <section id="page-process" class="page-view hidden">
+        <div class="preset-strip">
+          <div class="preset-left">
+            <span class="pill pill-good">SchedulingWatcher 运行中 (1s 扫描)</span>
+            <span style="color:var(--text-secondary)">点击进程可直接调整亲和性 / CPU Sets / 优先级，满意后一键生成规则</span>
+          </div>
+          <div class="preset-right">
+            <button class="btn">管理自定义掩码</button>
+            <button class="btn btn-primary">将当前修改存为调度规则</button>
+          </div>
+        </div>
+        <div class="section-box">
+          <div class="section-head"><div class="section-title">实时进程与调度对齐</div><span class="section-sub">目标值 vs 实际值 · 识别用户接管与漂移</span></div>
+          <table class="data-table">
+            <thead><tr><th>进程</th><th>CPU</th><th>优先级</th><th>目标调度</th><th>实际状态</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr><td>Cyberpunk2077.exe (PID 14820)</td><td>24.1%</td><td>High</td><td>CPU Sets: 0–7 (CCD0)</td><td><span class="pill pill-good">已对齐</span></td><td><button class="btn btn-sm">改绑核</button></td></tr>
+              <tr><td>obs64.exe (PID 9312)</td><td>6.8%</td><td>AboveNormal</td><td>Affinity: 0xFF00 (CCD1)</td><td><span class="pill pill-warn">用户已接管</span></td><td><button class="btn btn-sm">释放接管</button></td></tr>
+              <tr><td>chrome.exe (PID 4120)</td><td>2.4%</td><td>Normal</td><td>— (未纳管)</td><td><span class="pill pill-muted">默认</span></td><td><button class="btn btn-sm">设限制</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- PAGE: SCENES / PLANS / DIAGNOSTICS / SETTINGS (Summaries for Round 2) -->
+      <section id="page-scenes" class="page-view hidden">
+        <div class="section-box">
+          <div class="section-head"><div class="section-title">场景自动化（触发 → 领域仲裁 → 退出恢复）</div><button class="btn btn-primary btn-sm">+ 新建场景</button></div>
+          <table class="data-table">
+            <thead><tr><th>优先级</th><th>场景名称</th><th>触发条件</th><th>引用方案（按域独立仲裁）</th><th>退出策略</th><th>状态</th></tr></thead>
+            <tbody>
+              <tr><td>P10</td><td>游戏低延迟</td><td>进程：Cyberpunk2077.exe</td><td>CPU: 游戏负压 · 调度: 游戏CCD0</td><td>仅恢复未接管字段</td><td><span class="pill pill-good">活动中</span></td></tr>
+              <tr><td>P20</td><td>离电续航</td><td>电源：DC 电池</td><td>Power: 静音省电</td><td>恢复原电源计划</td><td><span class="pill pill-muted">待命</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="page-plans" class="page-view hidden">
+        <div class="section-box">
+          <div class="section-head"><div class="section-title">方案库（三大独立域预设集合）</div><span class="section-sub">方案可独立应用、复制、对比或由场景引用</span></div>
+          <table class="data-table">
+            <thead><tr><th>类型</th><th>名称</th><th>摘要</th><th>上次应用</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr><td><span class="pill pill-info">CPU</span></td><td>游戏负压</td><td>Default -15 · CCD0 -25 · FMax 5450</td><td>Applied (rev 3)</td><td><button class="btn btn-sm">加载到编辑器</button></td></tr>
+              <tr><td><span class="pill pill-good">Power</span></td><td>卓越性能</td><td>Boost: Efficient · EPP: 20%</td><td>Draft</td><td><button class="btn btn-sm">应用</button></td></tr>
+              <tr><td><span class="pill pill-warn">Sched</span></td><td>游戏 CCD0</td><td>Cyberpunk2077 → CPU Sets 0–7 · High</td><td>Applied (rev 1)</td><td><button class="btn btn-sm">应用</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="page-diagnostics" class="page-view hidden">
+        <div class="section-box">
+          <div class="section-head"><div class="section-title">硬件与模块能力矩阵（局部不可用不阻断全局）</div></div>
+          <table class="data-table">
+            <thead><tr><th>能力域</th><th>通道状态</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td>amd.co / amd.fmax</td><td><span class="pill pill-good">ok</span></td><td>PawnIO RyzenSMU.bin 已就绪（固件持久）</td></tr>
+              <tr><td>intel.msr</td><td><span class="pill pill-muted">NotSupported</span></td><td>当前平台为 AMD（局部不适用，非故障）</td></tr>
+              <tr><td>power.policy / sched.cpusets</td><td><span class="pill pill-good">ok</span></td><td>LocalSystem 服务权限已就绪</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="page-settings" class="page-view hidden">
+        <div class="section-box">
+          <div class="section-head"><div class="section-title">外观、密度、语言与自动化策略</div></div>
+          <table class="data-table">
+            <tbody>
+              <tr><td>界面密度</td><td>标准 / 紧凑（可通过顶部工具栏实时体验切换）</td></tr>
+              <tr><td>主题与强调色</td><td>跟随系统 / 深色 / 浅色；自定义强调色不锁定，自动对比度钳制</td></tr>
+              <tr><td>外部修改策略</td><td>尊重外部修改（默认：检测到外部改写时暂停自动化覆盖，记入账本）</td></tr>
+              <tr><td>语言与缩放</td><td>zh-CN / zh-TW / en-US 运行时切换 · 缩放 80%–160%</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Right Collapsible Inspector (StateLedger) -->
+    <aside class="inspector" id="inspectorDrawer">
+      <div class="inspector-head">
+        <span>StateLedger 状态账本</span>
+        <button class="btn btn-sm btn-ghost" id="closeInspectorBtn">收起</button>
+      </div>
+      <div class="inspector-body" id="ledgerList">
+        <div class="ledger-row">
+          <div class="ledger-top"><span class="ledger-target">cpu.co.0</span><span class="pill pill-good">Applied · Scene</span></div>
+          <div class="ledger-vals">前值 0 → 目标 -25 → 实测 -25</div>
+        </div>
+        <div class="ledger-row">
+          <div class="ledger-top"><span class="ledger-target">cpu.fmax</span><span class="pill pill-good">Applied · Plan</span></div>
+          <div class="ledger-vals">前值 5700 → 目标 5450 → 实测 5450</div>
+        </div>
+        <div class="ledger-row">
+          <div class="ledger-top"><span class="ledger-target">sched.9312.affinity</span><span class="pill pill-warn">User Takeover</span></div>
+          <div class="ledger-vals">外部修改为 0xFF00 · 自动化已暂停</div>
+          <div><button class="btn btn-sm" onclick="releaseTakeover(this)">释放接管</button></div>
+        </div>
+        <div class="ledger-row">
+          <div class="ledger-top"><span class="ledger-target">power.aspm</span><span class="pill pill-bad">Skipped</span></div>
+          <div class="ledger-vals">受 BIOS 策略限制，已跳过写入</div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+
+<script>
+  // State for interactive CPU CO demonstration
+  const state = {
+    arch: 'c1',
+    page: 'cpu',
+    c2Group: 'live',
+    defaultCo: -15,
+    ccd0Co: -25,
+    fmax: 5450,
+    actualFmax: 5450,
+    cores: [
+      { id: 0, override: null, auto: false, actual: -25, owner: 'Scene: 游戏低延迟' },
+      { id: 1, override: null, auto: false, actual: -25, owner: 'Scene: 游戏低延迟' },
+      { id: 2, override: -30, auto: false, actual: -30, owner: 'User 手动覆盖' },
+      { id: 3, override: null, auto: true,  actual: 0,   owner: 'Auto (跳过写入)' },
+      { id: 4, override: null, auto: false, actual: -15, owner: 'Default 继承' },
+      { id: 5, override: null, auto: false, actual: -15, owner: 'Default 继承' },
+      { id: 6, override: null, auto: false, actual: -15, owner: 'Default 继承' },
+      { id: 7, override: null, auto: false, actual: -15, owner: 'Default 继承' }
+    ],
+    dirty: true
+  };
+
+  function getTarget(c) {
+    if (c.auto) return 'auto';
+    if (c.override !== null) return c.override;
+    if (c.id < 4) return state.ccd0Co;
+    return state.defaultCo;
+  }
+
+  function renderCores() {
+    const c0 = document.getElementById('ccd0Rows');
+    const c1 = document.getElementById('ccd1Rows');
+    c0.innerHTML = ''; c1.innerHTML = '';
+    state.cores.forEach(c => {
+      const target = getTarget(c);
+      const changed = target !== 'auto' && target !== c.actual;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><strong>Core ${c.id}</strong></td>
+        <td>
+          <div class="stepper">
+            <button onclick="adjCore(${c.id}, -5)">-</button>
+            <span style="color:${changed ? 'var(--warn)' : 'var(--text-primary)'}">${target}</span>
+            <button onclick="adjCore(${c.id}, 5)">+</button>
+            <button class="btn btn-sm" style="width:auto;padding:0 5px;font-size:10.5px" onclick="toggleAuto(${c.id})">${c.auto ? '取消Auto' : 'Auto'}</button>
+          </div>
+        </td>
+        <td>${c.actual}</td>
+        <td><span class="pill ${c.auto ? 'pill-muted' : changed ? 'pill-warn' : 'pill-good'}">${changed ? '待应用' : c.owner}</span></td>
+      `;
+      (c.id < 4 ? c0 : c1).appendChild(tr);
+    });
+    document.getElementById('valDefault').textContent = state.defaultCo;
+    document.getElementById('valCcd0').textContent = state.ccd0Co;
+    document.getElementById('valCcd0Btn').textContent = state.ccd0Co;
+    document.getElementById('valCcd1').textContent = `继承(${state.defaultCo})`;
+    document.getElementById('valFmax').textContent = state.fmax;
+    document.getElementById('valFmaxActual').textContent = `${state.actualFmax} MHz`;
+
+    const strip = document.getElementById('cpuPresetStrip');
+    const badge = document.getElementById('cpuDirtyBadge');
+    const tag = document.getElementById('cpuDirtyTag');
+    const pendingCount = state.cores.filter(c => {
+      const t = getTarget(c);
+      return t !== 'auto' && t !== c.actual;
+    }).length + (state.fmax !== state.actualFmax ? 1 : 0);
+
+    if (pendingCount > 0) {
+      strip.classList.add('dirty');
+      badge.textContent = `已修改 ${pendingCount} 项（未应用/未保存）`;
+      badge.className = 'pill pill-warn';
+      tag.classList.remove('hidden');
+    } else {
+      strip.classList.remove('dirty');
+      badge.textContent = '硬件实际值与当前编辑一致';
+      badge.className = 'pill pill-good';
+      tag.classList.add('hidden');
+    }
+  }
+
+  window.adjDefault = d => { state.defaultCo = Math.max(-50, Math.min(50, state.defaultCo + d)); renderCores(); };
+  window.adjCcd0 = d => { state.ccd0Co = Math.max(-50, Math.min(50, state.ccd0Co + d)); renderCores(); };
+  window.adjFmax = d => { state.fmax = Math.max(4450, Math.min(5750, state.fmax + d)); renderCores(); };
+  window.adjCore = (id, d) => {
+    const c = state.cores[id];
+    c.auto = false;
+    const base = c.override !== null ? c.override : (id < 4 ? state.ccd0Co : state.defaultCo);
+    c.override = Math.max(-50, Math.min(50, base + d));
+    renderCores();
+  };
+  window.toggleAuto = id => {
+    const c = state.cores[id];
+    c.auto = !c.auto;
+    renderCores();
+  };
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.remove('hidden');
+    clearTimeout(window._toastTimer);
+    window._toastTimer = setTimeout(() => t.classList.add('hidden'), 2600);
+  }
+
+  document.getElementById('btnApplyCpu').addEventListener('click', () => {
+    state.cores.forEach(c => {
+      const t = getTarget(c);
+      if (t !== 'auto') { c.actual = t; c.owner = 'User 手动应用'; }
+    });
+    state.actualFmax = state.fmax;
+    renderCores();
+    showToast('已写入硬件并回读校验通过，可随时“另存为新方案”');
+  });
+
+  document.getElementById('btnResetCpu').addEventListener('click', () => {
+    state.defaultCo = -15; state.ccd0Co = -25; state.fmax = 5450;
+    state.cores.forEach(c => { c.override = null; c.auto = false; c.actual = c.id < 4 ? -25 : -15; });
+    state.actualFmax = 5450;
+    renderCores();
+    showToast('已还原到参考方案「游戏负压」');
+  });
+
+  document.getElementById('btnSaveAsPlan').addEventListener('click', () => {
+    showToast('将当前实时参数另存为新 CpuTuningPlan（带平台绑定与版本）');
+  });
+
+  window.releaseTakeover = btn => {
+    const row = btn.closest('.ledger-row');
+    row.querySelector('.pill').textContent = 'Released';
+    row.querySelector('.pill').className = 'pill pill-good';
+    btn.remove();
+    showToast('已释放用户接管，自动化将重新接手');
+  };
+
+  // Page switching
+  function switchPage(page) {
+    state.page = page;
+    document.querySelectorAll('.page-view').forEach(el => el.classList.add('hidden'));
+    const target = document.getElementById('page-' + page);
+    if (target) target.classList.remove('hidden');
+    document.querySelectorAll('#c1Rail .nav-item').forEach(b => b.classList.toggle('active', b.dataset.page === page));
+    document.querySelectorAll('#c2SubTabs .tab').forEach(b => b.classList.toggle('active', b.dataset.page === page));
+  }
+
+  document.querySelectorAll('#c1Rail .nav-item').forEach(btn => {
+    btn.addEventListener('click', () => switchPage(btn.dataset.page));
+  });
+
+  // Architecture C1 vs C2 switching
+  document.querySelectorAll('#archSeg button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#archSeg button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const arch = btn.dataset.arch;
+      document.getElementById('c1Rail').classList.toggle('hidden', arch === 'c2');
+      document.getElementById('c2Bar').classList.toggle('visible', arch === 'c2');
+    });
+  });
+
+  const c2SubMap = {
+    live: [
+      { id: 'overview', label: '监控总览' },
+      { id: 'cpu', label: 'CPU 调校' },
+      { id: 'power', label: '电源策略' },
+      { id: 'process', label: '进程与调度' }
+    ],
+    automation: [
+      { id: 'scenes', label: '场景自动化' },
+      { id: 'plans', label: '方案库' }
+    ],
+    system: [
+      { id: 'diagnostics', label: '能力与诊断' },
+      { id: 'settings', label: '系统设置' }
+    ]
+  };
+
+  document.querySelectorAll('#c2TopTabs .tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#c2TopTabs .tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const group = btn.dataset.c2group;
+      const sub = document.getElementById('c2SubTabs');
+      sub.innerHTML = '';
+      c2SubMap[group].forEach((item, idx) => {
+        const b = document.createElement('button');
+        b.className = 'tab' + (idx === 0 ? ' active' : '');
+        b.dataset.page = item.id;
+        b.textContent = item.label;
+        b.addEventListener('click', () => switchPage(item.id));
+        sub.appendChild(b);
+      });
+      switchPage(c2SubMap[group][0].id);
+    });
+  });
+  document.querySelectorAll('#c2SubTabs .tab').forEach(btn => {
+    btn.addEventListener('click', () => switchPage(btn.dataset.page));
+  });
+
+  // Density, Theme, Accent, Inspector
+  document.querySelectorAll('#densitySeg button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#densitySeg button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('appShell').dataset.density = btn.dataset.density;
+    });
+  });
+  document.querySelectorAll('#themeSeg button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#themeSeg button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('appShell').dataset.theme = btn.dataset.theme;
+    });
+  });
+  document.querySelectorAll('.accent-dot').forEach(dot => {
+    dot.addEventListener('click', () => {
+      document.querySelectorAll('.accent-dot').forEach(d => d.classList.remove('active'));
+      dot.classList.add('active');
+      document.documentElement.style.setProperty('--accent', dot.dataset.accent);
+      document.documentElement.style.setProperty('--accent-subtle', dot.dataset.accent + '24');
+      document.documentElement.style.setProperty('--accent-border', dot.dataset.accent + '73');
+    });
+  });
+
+  const drawer = document.getElementById('inspectorDrawer');
+  document.getElementById('toggleInspectorBtn').addEventListener('click', () => drawer.classList.toggle('collapsed'));
+  document.getElementById('closeInspectorBtn').addEventListener('click', () => drawer.classList.add('collapsed'));
+
+  document.getElementById('toggleSceneBtn').addEventListener('click', function() {
+    const pill = document.getElementById('scenePill');
+    if (this.textContent === '停用') {
+      pill.querySelector('strong').textContent = '无活动场景';
+      this.textContent = '启用默认';
+      showToast('已停用活动场景，并按所有权回退未接管字段');
+    } else {
+      pill.querySelector('strong').textContent = '游戏低延迟';
+      this.textContent = '停用';
+      showToast('已激活场景「游戏低延迟」');
+    }
+  });
+
+  renderCores();
+</script>
+</body>
+</html>

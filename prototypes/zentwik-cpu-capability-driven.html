@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Zentwik UI 原型 · 能力驱动的动态 CPU 调校架构</title>
+<style>
+  :root {
+    --bg-window: #0d1015;
+    --bg-surface: #171c26;
+    --bg-surface-alt: #1e2430;
+    --bg-hover: #252d3d;
+    --border: #283042;
+    --border-strong: #3a465e;
+    --text-primary: #eef2f8;
+    --text-secondary: #9aa6bc;
+    --text-muted: #6c7890;
+    --accent: #3b82f6;
+    --accent-subtle: rgba(59, 130, 246, 0.16);
+    --accent-border: rgba(59, 130, 246, 0.55);
+    --good: #22c55e;
+    --good-subtle: rgba(34, 197, 94, 0.14);
+    --warn: #f59e0b;
+    --warn-subtle: rgba(245, 158, 11, 0.14);
+    --info: #38bdf8;
+    --info-subtle: rgba(56, 189, 248, 0.14);
+    --radius: 6px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg-window); color: var(--text-primary);
+    font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+    font-size: 13px; line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .proto-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    padding: 8px 16px; background: #111620; border-bottom: 1px solid var(--border);
+  }
+  .badge {
+    background: var(--accent-subtle); color: #93c5fd; border: 1px solid var(--accent-border);
+    padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
+  }
+  .seg {
+    display: inline-flex; background: #1a202c; border: 1px solid var(--border-strong);
+    border-radius: 6px; padding: 3px; gap: 3px;
+  }
+  .seg button {
+    border: none; background: transparent; color: var(--text-secondary);
+    padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 11.5px;
+  }
+  .seg button.active { background: var(--accent); color: #fff; font-weight: 600; }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .sub { color: var(--text-secondary); font-size: 11.5px; }
+
+  /* Live-First Top Preset Strip */
+  .preset-strip {
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+    padding: 10px 14px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
+  }
+  .preset-strip.dirty {
+    border-color: var(--warn);
+    background: linear-gradient(90deg, var(--warn-subtle) 0%, var(--bg-surface) 38%);
+  }
+
+  /* Capability Anchor Strip (only shown for available modules) */
+  .cap-anchor-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+    padding: 6px 10px; background: var(--bg-surface-alt); border: 1px solid var(--border); border-radius: var(--radius);
+  }
+  .anchor-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .anchor-pill {
+    border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-secondary);
+    padding: 3px 10px; border-radius: 999px; font-size: 11.5px; cursor: pointer;
+  }
+  .anchor-pill:hover { border-color: var(--accent); color: var(--text-primary); }
+  .anchor-pill.future { border-style: dashed; }
+
+  .btn {
+    height: 28px; padding: 0 10px; border-radius: var(--radius);
+    border: 1px solid var(--border-strong); background: var(--bg-surface-alt);
+    color: var(--text-primary); cursor: pointer; font-size: 12px;
+  }
+  .btn:hover { background: var(--bg-hover); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .btn-sm { height: 22px; padding: 0 7px; font-size: 11px; }
+
+  .pill {
+    display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 3px;
+    font-size: 11px; font-weight: 600;
+  }
+  .pill-good { background: var(--good-subtle); color: var(--good); }
+  .pill-warn { background: var(--warn-subtle); color: var(--warn); }
+  .pill-info { background: var(--info-subtle); color: var(--info); }
+  .pill-muted { background: var(--bg-surface-alt); color: var(--text-secondary); }
+
+  select.flat-select {
+    height: 28px; padding: 0 8px; border-radius: var(--radius);
+    background: var(--bg-surface-alt); border: 1px solid var(--border-strong);
+    color: var(--text-primary); font-size: 12px;
+  }
+
+  /* Capability Section Card */
+  .cap-section {
+    background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+  }
+  .cap-head {
+    padding: 9px 14px; background: var(--bg-surface-alt); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  }
+  .cap-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
+
+  /* Two-col helper for Power + FMax/OC */
+  .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 820px) { .two-col { grid-template-columns: 1fr; } }
+
+  /* EQ CO Grid */
+  .ccd-block {
+    background: var(--bg-surface-alt); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px;
+  }
+  .eq-grid {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 8px;
+  }
+  @media (max-width: 680px) { .eq-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .eq-cell {
+    background: var(--bg-surface); border: 1px solid var(--border); border-radius: 5px;
+    padding: 7px 9px; display: flex; flex-direction: column; gap: 5px;
+  }
+  .bar-track {
+    position: relative; height: 8px; background: #10141c;
+    border: 1px solid var(--border); border-radius: 3px; cursor: ew-resize;
+  }
+  .bar-zero { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--border-strong); }
+  .bar-fill { position: absolute; top: 1px; bottom: 1px; border-radius: 2px; background: var(--accent); }
+  .num-input {
+    width: 46px; height: 22px; text-align: center; background: var(--bg-surface-alt);
+    border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-weight: 700; font-size: 12.5px;
+  }
+
+  /* Curve Shaper 2D Matrix (Temp x Freq) */
+  .cs-table { width: 100%; border-collapse: collapse; }
+  .cs-table th, .cs-table td {
+    padding: 7px 8px; border: 1px solid var(--border); text-align: center; font-size: 12px;
+  }
+  .cs-table th { background: var(--bg-surface-alt); color: var(--text-secondary); font-weight: 600; }
+
+  /* Slider Row (Power / FMax / OC) */
+  .limit-row {
+    display: grid; grid-template-columns: 160px 1fr 78px; align-items: center; gap: 12px;
+    padding: 6px 0; border-bottom: 1px solid var(--border);
+  }
+  .limit-row:last-child { border-bottom: none; }
+  input[type="range"] { width: 100%; accent-color: var(--accent); }
+
+  /* Unsupported Collapsed Footer */
+  .unsupported-bar {
+    padding: 8px 12px; border: 1px dashed var(--border-strong); border-radius: var(--radius);
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    color: var(--text-secondary); font-size: 12px;
+  }
+
+  .hidden { display: none !important; }
+  .toast {
+    position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+    background: #1e293b; color: #f8fafc; border: 1px solid var(--accent);
+    padding: 7px 14px; border-radius: 6px; font-size: 12px; z-index: 50;
+  }
+</style>
+</head>
+<body>
+
+<div class="proto-bar">
+  <div style="display:flex;align-items:center;gap:10px">
+    <span class="badge">能力驱动架构原型</span>
+    <strong>不同平台看到的能力模块完全不同（自动适配 CO / CS / OC / 功耗限制）</strong>
+  </div>
+  <div class="seg" id="profileSeg">
+    <button class="active" onclick="setProfile('zen5-full', this)">用户 A：Zen5 全能桌面 (CO+CS+OC+功耗)</button>
+    <button onclick="setProfile('hx-laptop', this)">用户 B：9955HX 移动端 (仅 CO+FMax)</button>
+    <button onclick="setProfile('intel-full', this)">用户 C：Intel 桌面/HX (电压+倍频+PL)</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <!-- 1. Live-First Preset & Apply Bar (Unified across all hardware) -->
+  <div class="preset-strip dirty">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span class="pill pill-good" id="persistBadge">AMD SMU · 固件持久</span>
+      <span class="sub">参考方案：</span>
+      <select class="flat-select"><option>当前实时工作区（偏离参考 2 项）</option><option>出厂基线</option></select>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button class="btn" onclick="toast('还原参考值')">还原</button>
+      <button class="btn" onclick="toast('另存为新 CpuTuningPlan')">另存为方案…</button>
+      <button class="btn btn-primary" onclick="toast('仅写入当前平台支持且已修改的模块并回读校验')">应用并回读</button>
+    </div>
+  </div>
+
+  <!-- 2. Dynamic Capability Anchor Strip -->
+  <div class="cap-anchor-bar">
+    <div class="anchor-pills" id="anchorPills"></div>
+    <span class="sub" id="capSummaryText">已探测到 4 个可用调校模块</span>
+  </div>
+
+  <!-- MODULE: AMD Curve Optimizer (EQ Matrix) -->
+  <section class="cap-section" id="mod-co">
+    <div class="cap-head">
+      <div><strong>Curve Optimizer (CO)</strong> <span class="sub">· 逐核动态电压-频率偏移</span></div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span class="sub">全部平移：</span>
+        <button class="btn btn-sm" onclick="toast('全部 -5')">-5</button>
+        <button class="btn btn-sm" onclick="toast('全部 +5')">+5</button>
+        <button class="btn btn-sm" onclick="toast('全部归零')">归零</button>
+      </div>
+    </div>
+    <div class="cap-body">
+      <div class="ccd-block">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong>CCD 0 (Core 0–3)</strong>
+          <div style="display:flex;gap:4px"><button class="btn btn-sm">-5</button><button class="btn btn-sm">+5</button></div>
+        </div>
+        <div class="eq-grid">
+          <div class="eq-cell"><div style="display:flex;justify-content:space-between;font-size:11px"><span>Core 0</span><span class="sub">Auto</span></div><div class="bar-track"><div class="bar-zero"></div><div class="bar-fill" style="left:25%;width:25%"></div></div><div style="display:flex;justify-content:space-between;align-items:center"><input class="num-input" value="-25"/><span class="sub">回读 -25</span></div></div>
+          <div class="eq-cell"><div style="display:flex;justify-content:space-between;font-size:11px"><span>Core 1</span><span class="sub">Auto</span></div><div class="bar-track"><div class="bar-zero"></div><div class="bar-fill" style="left:25%;width:25%"></div></div><div style="display:flex;justify-content:space-between;align-items:center"><input class="num-input" value="-25"/><span class="sub">回读 -25</span></div></div>
+          <div class="eq-cell"><div style="display:flex;justify-content:space-between;font-size:11px"><span>Core 2</span><span class="sub">Auto</span></div><div class="bar-track"><div class="bar-zero"></div><div class="bar-fill" style="left:20%;width:30%"></div></div><div style="display:flex;justify-content:space-between;align-items:center"><input class="num-input" value="-30"/><span class="sub">回读 -25</span></div></div>
+          <div class="eq-cell"><div style="display:flex;justify-content:space-between;font-size:11px"><span>Core 3</span><span class="sub">Auto</span></div><div class="bar-track"><div class="bar-zero"></div><div class="bar-fill" style="left:35%;width:15%"></div></div><div style="display:flex;justify-content:space-between;align-items:center"><input class="num-input" value="-15"/><span class="sub">回读 -15</span></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MODULE: AMD Curve Shaper (Zen5+ Future Capability) -->
+  <section class="cap-section" id="mod-cs">
+    <div class="cap-head">
+      <div><strong>Curve Shaper (CS)</strong> <span class="pill pill-info" style="margin-left:6px">Zen5+ 能力</span> <span class="sub">· 按频率段 × 温度段塑造曲线</span></div>
+      <button class="btn btn-sm" onclick="toast('全部重置为 Auto')">重置为 Auto</button>
+    </div>
+    <div class="cap-body">
+      <table class="cs-table">
+        <thead>
+          <tr><th>温度 \ 频率段</th><th>Min Freq</th><th>Low Freq</th><th>Med Freq</th><th>High Freq</th><th>Max Freq</th></tr>
+        </thead>
+        <tbody>
+          <tr><th>低温 (Low Temp)</th><td><input class="num-input" value="0"/></td><td><input class="num-input" value="-10"/></td><td><input class="num-input" value="-15"/></td><td><input class="num-input" value="-20"/></td><td><input class="num-input" value="-15"/></td></tr>
+          <tr><th>中温 (Med Temp)</th><td><input class="num-input" value="0"/></td><td><input class="num-input" value="-10"/></td><td><input class="num-input" value="-20"/></td><td><input class="num-input" value="-25"/></td><td><input class="num-input" value="-20"/></td></tr>
+          <tr><th>高温 (High Temp)</th><td><input class="num-input" value="0"/></td><td><input class="num-input" value="-5"/></td><td><input class="num-input" value="-15"/></td><td><input class="num-input" value="-15"/></td><td><input class="num-input" value="-10"/></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- MODULE: Frequency & OC + Power Limits (2-col on wide screens) -->
+  <div class="two-col">
+    <!-- FMax / OC -->
+    <section class="cap-section" id="mod-freq">
+      <div class="cap-head"><strong>频率上限与超频 (FMax / OC)</strong><span class="sub">按平台能力显隐</span></div>
+      <div class="cap-body">
+        <div class="limit-row">
+          <div><strong>FMax 加速上限</strong><div class="sub">基线 5700 MHz</div></div>
+          <input type="range" min="4450" max="5750" step="25" value="5450" />
+          <input class="num-input" value="5450" style="width:66px"/>
+        </div>
+        <div class="limit-row" id="sub-oc">
+          <div><strong>全核定频 (Manual OC)</strong><div class="sub">仅解锁平台支持</div></div>
+          <input type="range" min="3600" max="5600" step="50" value="5200" />
+          <input class="num-input" value="Auto" style="width:66px"/>
+        </div>
+      </div>
+    </section>
+
+    <!-- Power Limits -->
+    <section class="cap-section" id="mod-power">
+      <div class="cap-head"><strong>处理器功耗与电流限制</strong><span class="sub">PPT / TDC / EDC / PL</span></div>
+      <div class="cap-body">
+        <div class="limit-row">
+          <div><strong id="p1Label">PPT 封装功耗上限</strong><div class="sub">默认 142 W</div></div>
+          <input type="range" min="45" max="230" value="125" />
+          <input class="num-input" value="125 W" style="width:66px"/>
+        </div>
+        <div class="limit-row">
+          <div><strong id="p2Label">TDC / EDC 电流墙</strong><div class="sub">默认 110 A / 170 A</div></div>
+          <input type="range" min="40" max="200" value="105" />
+          <input class="num-input" value="105 A" style="width:66px"/>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- MODULE: Intel Voltage & Turbo -->
+  <section class="cap-section hidden" id="mod-intel">
+    <div class="cap-head">
+      <div><strong>Intel OC Mailbox 三平面电压 &amp; 8 档睿频</strong> <span class="pill pill-warn" style="margin-left:6px">仅会话有效 · 注意 UVP 假阳性</span></div>
+    </div>
+    <div class="cap-body two-col">
+      <div>
+        <div class="limit-row"><strong>Core (IA) 电压偏移</strong><input type="range" min="-150" max="50" value="-45"/><input class="num-input" value="-45 mV" style="width:66px"/></div>
+        <div class="limit-row"><strong>Cache (Ring) 偏移</strong><input type="range" min="-150" max="50" value="-45"/><input class="num-input" value="-45 mV" style="width:66px"/></div>
+        <div class="limit-row"><strong>GPU (GT) 偏移</strong><input type="range" min="-100" max="50" value="0"/><input class="num-input" value="0 mV" style="width:66px"/></div>
+      </div>
+      <div>
+        <div class="limit-row"><strong>1–2 Core 倍频上限</strong><input type="range" min="30" max="60" value="54"/><input class="num-input" value="54x" style="width:66px"/></div>
+        <div class="limit-row"><strong>3–4 Core 倍频上限</strong><input type="range" min="30" max="60" value="52"/><input class="num-input" value="52x" style="width:66px"/></div>
+        <div class="limit-row"><strong>5–8 Core 倍频上限</strong><input type="range" min="30" max="60" value="49"/><input class="num-input" value="49x" style="width:66px"/></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Unsupported Capabilities Footer (Never pollutes main workspace) -->
+  <div class="unsupported-bar" id="unsupportedBar">
+    <span>当前平台不可用的调校项已自动隐藏：<strong id="unsupportedList">无（当前展示全功能模拟）</strong></span>
+    <button class="btn btn-sm" onclick="toast('查看硬件能力探测详情')">查看探测原因</button>
+  </div>
+</div>
+
+<div class="toast hidden" id="toastEl"></div>
+
+<script>
+  const profiles = {
+    'zen5-full': {
+      persist: ['AMD SMU · 固件持久', 'pill-good'],
+      anchors: ['Curve Optimizer', 'Curve Shaper (Zen5+)', 'FMax & 定频 OC', '功耗限制 (PPT/TDC/EDC)'],
+      show: ['mod-co', 'mod-cs', 'mod-freq', 'sub-oc', 'mod-power'],
+      hide: ['mod-intel'],
+      unsupported: '无（全模块就绪）'
+    },
+    'hx-laptop': {
+      persist: ['AMD SMU · 固件持久', 'pill-good'],
+      anchors: ['Curve Optimizer', 'FMax 加速上限'],
+      show: ['mod-co', 'mod-freq'],
+      hide: ['mod-cs', 'sub-oc', 'mod-power', 'mod-intel'],
+      unsupported: 'Curve Shaper (非 Zen5 桌面)、Manual OC (0xE6/0x2C 平台拒绝)、功耗墙 (HX 默认未启用)'
+    },
+    'intel-full': {
+      persist: ['Intel MSR · 仅当前会话有效', 'pill-warn'],
+      anchors: ['电压平面 (0x150)', '睿频倍频 (0x1AD)', '功耗墙 (PL1/PL2)'],
+      show: ['mod-intel', 'mod-power'],
+      hide: ['mod-co', 'mod-cs', 'mod-freq'],
+      unsupported: 'AMD Curve Optimizer / Curve Shaper / FMax (当前为 Intel 平台)'
+    }
+  };
+
+  function setProfile(key, btn) {
+    document.querySelectorAll('#profileSeg button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const p = profiles[key];
+
+    const pb = document.getElementById('persistBadge');
+    pb.textContent = p.persist[0];
+    pb.className = 'pill ' + p.persist[1];
+
+    p.show.forEach(id => document.getElementById(id).classList.remove('hidden'));
+    p.hide.forEach(id => document.getElementById(id).classList.add('hidden'));
+
+    const ap = document.getElementById('anchorPills');
+    ap.innerHTML = '';
+    p.anchors.forEach(a => {
+      const b = document.createElement('button');
+      b.className = 'anchor-pill';
+      b.textContent = a;
+      ap.appendChild(b);
+    });
+    document.getElementById('capSummaryText').textContent = `当前平台已启用 ${p.anchors.length} 个能力模块`;
+    document.getElementById('unsupportedList').textContent = p.unsupported;
+
+    if (key === 'intel-full') {
+      document.getElementById('p1Label').textContent = 'PL1 持续功耗上限';
+      document.getElementById('p2Label').textContent = 'PL2 短时爆发上限';
+    } else {
+      document.getElementById('p1Label').textContent = 'PPT 封装功耗上限';
+      document.getElementById('p2Label').textContent = 'TDC / EDC 电流墙';
+    }
+  }
+
+  function toast(msg) {
+    const el = document.getElementById('toastEl');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    clearTimeout(window._t);
+    window._t = setTimeout(() => el.classList.add('hidden'), 2200);
+  }
+
+  setProfile('zen5-full', document.querySelector('#profileSeg button.active'));
+</script>
+</body>
+</html>

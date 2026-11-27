@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Zentwik · 进程与调度（先锋极简概念版）</title>
+<style>
+  :root {
+    --bg-void: #07090d;
+    --bg-base: #0b0e14;
+    --bg-panel: rgba(255, 255, 255, 0.022);
+    --bg-elevated: #141923;
+    --bg-glass: rgba(20, 25, 35, 0.86);
+    --bg-hover: rgba(255, 255, 255, 0.048);
+    --bg-selected: rgba(59, 130, 246, 0.11);
+
+    --hairline: rgba(255, 255, 255, 0.055);
+    --hairline-strong: rgba(255, 255, 255, 0.14);
+
+    --ink-1: #f1f5f9;
+    --ink-2: #8b98b0;
+    --ink-3: #4e596e;
+
+    --accent: #3b82f6;
+    --accent-soft: rgba(59, 130, 246, 0.15);
+    --accent-glow: rgba(59, 130, 246, 0.22);
+
+    --good: #22c55e;
+    --warn: #f59e0b;
+    --bad: #ef4444;
+
+    --row-h: 40px;
+    --font-size: 13px;
+  }
+
+  [data-theme="light"] {
+    --bg-void: #eef1f6;
+    --bg-base: #f7f9fc;
+    --bg-panel: rgba(15, 23, 42, 0.025);
+    --bg-elevated: #ffffff;
+    --bg-glass: rgba(255, 255, 255, 0.9);
+    --bg-hover: rgba(15, 23, 42, 0.04);
+    --bg-selected: rgba(59, 130, 246, 0.08);
+    --hairline: rgba(15, 23, 42, 0.07);
+    --hairline-strong: rgba(15, 23, 42, 0.16);
+    --ink-1: #0f172a;
+    --ink-2: #475569;
+    --ink-3: #94a3b8;
+  }
+
+  [data-density="compact"] { --row-h: 32px; --font-size: 12px; }
+  [data-density="relaxed"] { --row-h: 46px; --font-size: 13.5px; }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: var(--bg-void); color: var(--ink-1);
+    font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+    font-size: var(--font-size); line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Subtle ambient glow tied to user's accent */
+  body::before {
+    content: ""; position: fixed; top: -180px; left: 120px; width: 640px; height: 360px;
+    background: radial-gradient(ellipse at center, var(--accent-glow) 0%, transparent 70%);
+    opacity: 0.35; pointer-events: none; z-index: 0;
+  }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(148, 160, 184, 0.18); border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(148, 160, 184, 0.35); }
+
+  /* Ultra-clean Titlebar */
+  .titlebar {
+    height: 36px; display: flex; align-items: center; justify-content: space-between;
+    padding-left: 16px; user-select: none; position: relative; z-index: 20;
+  }
+  .tb-telemetry {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-size: 11px; color: var(--ink-3); letter-spacing: 0.3px;
+  }
+  .tb-telemetry b { color: var(--ink-2); font-weight: 500; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+  .dot.good { background: var(--good); }
+  .dot.warn { background: var(--warn); box-shadow: 0 0 8px rgba(245, 158, 11, 0.65); }
+  .dot.muted { background: transparent; border: 1.5px solid var(--ink-3); }
+
+  .tb-right { display: flex; align-items: center; height: 100%; }
+  .tb-tools { display: flex; height: 100%; margin-right: 4px; }
+  .icon-btn, .cap-btn {
+    width: 38px; height: 100%; border: none; background: transparent; color: var(--ink-2);
+    cursor: pointer; display: flex; align-items: center; justify-content: center; position: relative;
+    transition: color .14s, background .14s;
+  }
+  .cap-btn { width: 44px; }
+  .icon-btn:hover, .cap-btn:hover { color: var(--ink-1); background: var(--bg-hover); }
+  .cap-btn.close:hover { background: #dc2626; color: #fff; }
+  .icon-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .cap-btn svg { width: 10px; height: 10px; stroke: currentColor; fill: none; stroke-width: 1.4; }
+  .mini-dot { position: absolute; top: 9px; right: 9px; width: 5px; height: 5px; border-radius: 50%; background: var(--warn); }
+
+  /* Main App Frame */
+  .shell {
+    height: calc(100vh - 36px); display: flex; position: relative; z-index: 1;
+  }
+
+  /* Minimal Floating-Style Icon/Label Nav Dock — Click Logo to Toggle! */
+  .nav-rail {
+    width: 168px; min-width: 168px;
+    padding: 10px 10px 14px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    transition: width .18s cubic-bezier(.22,1,.36,1), min-width .18s cubic-bezier(.22,1,.36,1);
+  }
+  .nav-rail.collapsed { width: 58px; min-width: 58px; padding: 10px 8px 14px; }
+
+  .brand-toggle {
+    width: 100%; border: none; background: transparent; color: var(--ink-1);
+    display: flex; align-items: center; gap: 10px; padding: 8px 10px; margin-bottom: 14px;
+    border-radius: 8px; cursor: pointer; overflow: hidden; transition: background .14s;
+  }
+  .brand-toggle:hover { background: var(--bg-hover); }
+  .brand-toggle svg { width: 22px; height: 22px; flex-shrink: 0; color: var(--accent); filter: drop-shadow(0 0 8px var(--accent-glow)); }
+  .brand-name { font-weight: 700; font-size: 14px; letter-spacing: 0.4px; white-space: nowrap; }
+  .nav-rail.collapsed .brand-toggle { justify-content: center; padding: 8px 0; }
+  .nav-rail.collapsed .brand-name, .nav-rail.collapsed .nav-label { display: none; }
+
+  .nav-btn {
+    width: 100%; height: 34px; border: none; background: transparent; color: var(--ink-2);
+    border-radius: 8px; padding: 0 10px; cursor: pointer;
+    display: flex; align-items: center; gap: 10px; font-size: var(--font-size);
+    transition: background .12s, color .12s; margin-bottom: 3px; position: relative;
+  }
+  .nav-rail.collapsed .nav-btn { justify-content: center; padding: 0; }
+  .nav-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.65; flex-shrink: 0; }
+  .nav-btn:hover { background: var(--bg-hover); color: var(--ink-1); }
+  .nav-btn.active { background: var(--bg-panel); color: var(--ink-1); font-weight: 600; }
+  .nav-btn.active::before {
+    content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2.5px;
+    border-radius: 2px; background: var(--accent);
+  }
+  .nav-btn.active svg { color: var(--accent); }
+
+  /* Elevated Main Surface Sheet (Gives architectural depth without box clutter) */
+  .canvas-sheet {
+    flex: 1; min-width: 0;
+    margin: 0 10px 10px 0;
+    background: var(--bg-base);
+    border: 1px solid var(--hairline);
+    border-radius: 12px;
+    display: flex; flex-direction: column; overflow: hidden;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+  }
+
+  /* Editorial Hero Header */
+  .hero-bar {
+    padding: 16px 22px 14px;
+    border-bottom: 1px solid var(--hairline);
+    display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  }
+  .hero-left { display: flex; flex-direction: column; gap: 3px; }
+  .hero-title-row { display: flex; align-items: center; gap: 10px; }
+  .hero-title { font-size: 18px; font-weight: 700; letter-spacing: -0.2px; }
+  .plan-chip {
+    border: 1px solid var(--hairline); background: var(--bg-panel); color: var(--ink-2);
+    padding: 3px 10px; border-radius: 999px; font-size: 11.5px; cursor: pointer;
+    transition: border-color .12s, color .12s;
+  }
+  .plan-chip:hover { border-color: var(--hairline-strong); color: var(--ink-1); }
+  .hero-sub { font-size: 11.5px; color: var(--ink-3); letter-spacing: 0.2px; }
+
+  .hero-right { display: flex; align-items: center; gap: 8px; }
+
+  /* Command Search Capsule */
+  .cmd-search {
+    position: relative; display: flex; align-items: center;
+  }
+  .cmd-search svg {
+    position: absolute; left: 10px; width: 13px; height: 13px; stroke: var(--ink-3); fill: none; stroke-width: 1.8; pointer-events: none;
+  }
+  .cmd-search input {
+    height: 30px; width: 220px; padding: 0 12px 0 30px; border-radius: 999px;
+    background: var(--bg-panel); border: 1px solid var(--hairline);
+    color: var(--ink-1); font-size: 12px; outline: none; transition: width .16s, border-color .14s;
+  }
+  .cmd-search input:focus { width: 260px; border-color: var(--accent); background: var(--bg-elevated); }
+
+  .btn {
+    height: 30px; padding: 0 13px; border-radius: 7px;
+    border: 1px solid var(--hairline-strong); background: transparent;
+    color: var(--ink-1); cursor: pointer; font-size: 12px;
+    display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+    transition: background .12s, transform .08s;
+  }
+  .btn:hover { background: var(--bg-hover); }
+  .btn:active { transform: scale(0.98); }
+  .btn-primary {
+    background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600;
+    box-shadow: 0 4px 14px var(--accent-glow);
+  }
+  .btn-primary:hover { filter: brightness(1.08); background: var(--accent); }
+  .btn-ghost { border-color: transparent; color: var(--ink-2); }
+  .btn-ghost:hover { color: var(--ink-1); background: var(--bg-hover); }
+  .btn-sm { height: 24px; padding: 0 9px; font-size: 11.5px; border-radius: 5px; }
+
+  /* Split Body */
+  .split-body { flex: 1; min-height: 0; display: flex; }
+
+  /* Left Saved Rules Column — Right-aligned interactive dot! */
+  .rules-pane {
+    width: 246px; min-width: 246px;
+    border-right: 1px solid var(--hairline);
+    display: flex; flex-direction: column;
+    background: rgba(0, 0, 0, 0.14);
+  }
+  .rules-pane.collapsed { display: none; }
+  .pane-head {
+    padding: 12px 14px 8px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .pane-title { font-size: 11px; font-weight: 600; color: var(--ink-3); letter-spacing: 0.6px; text-transform: uppercase; }
+  .rules-list { flex: 1; overflow-y: auto; padding: 4px 8px 12px; display: flex; flex-direction: column; gap: 2px; }
+
+  .rule-item {
+    padding: 9px 10px; border-radius: 7px; cursor: pointer;
+    display: flex; flex-direction: column; gap: 3px; transition: background .12s;
+  }
+  .rule-item:hover { background: var(--bg-hover); }
+  .rule-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .rule-name {
+    font-weight: 600; font-size: 12.5px; color: var(--ink-1);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  /* Right-aligned dot; amber dot is clickable! */
+  .dot-hit {
+    width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 50%; border: none; background: transparent; padding: 0; flex-shrink: 0;
+  }
+  .dot-hit.interactive { cursor: pointer; }
+  .dot-hit.interactive:hover { background: rgba(245, 158, 11, 0.16); }
+
+  .rule-meta { font-size: 11.5px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Main Process Table */
+  .proc-pane { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .proc-subbar {
+    padding: 8px 20px; border-bottom: 1px solid var(--hairline);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .filter-pills { display: flex; gap: 4px; }
+  .f-pill {
+    border: none; background: transparent; color: var(--ink-2);
+    padding: 4px 10px; border-radius: 999px; cursor: pointer; font-size: 11.5px;
+    transition: background .12s, color .12s;
+  }
+  .f-pill:hover { color: var(--ink-1); background: var(--bg-hover); }
+  .f-pill.active { background: var(--bg-panel); color: var(--ink-1); font-weight: 600; }
+
+  .batch-strip {
+    padding: 7px 20px; background: var(--accent-soft); border-bottom: 1px solid var(--accent-glow);
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+
+  .table-scroll { flex: 1; overflow: auto; }
+  table.proc-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  table.proc-grid th, table.proc-grid td {
+    height: var(--row-h); padding: 0 10px;
+    border-bottom: 1px solid var(--hairline);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  table.proc-grid th:first-child, table.proc-grid td:first-child { padding-left: 20px; }
+  table.proc-grid th:last-child, table.proc-grid td:last-child { padding-right: 20px; }
+
+  table.proc-grid th {
+    position: sticky; top: 0; z-index: 5; background: var(--bg-base);
+    color: var(--ink-3); font-size: 11px; font-weight: 600; letter-spacing: 0.3px;
+    text-align: left; cursor: pointer; user-select: none;
+  }
+  table.proc-grid th:hover { color: var(--ink-1); }
+  table.proc-grid th.num, table.proc-grid td.num { text-align: right; }
+
+  table.proc-grid tbody tr { transition: background .08s; }
+  table.proc-grid tbody tr:hover { background: var(--bg-hover); }
+  table.proc-grid tbody tr.selected { background: var(--bg-selected); }
+
+  /* Dot hugs directly right of process name */
+  .proc-name-wrap { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; }
+  .proc-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); font-weight: 500; }
+  tr.managed .proc-name-text { color: var(--ink-1); font-weight: 600; }
+
+  .editable-cell {
+    display: inline-flex; align-items: center;
+    padding: 3px 8px; margin-left: -8px; border-radius: 5px;
+    cursor: pointer; color: var(--ink-3); transition: background .1s, color .1s;
+  }
+  .editable-cell.customized { color: var(--ink-1); font-weight: 500; }
+  .editable-cell:hover { background: rgba(255, 255, 255, 0.08); color: var(--ink-1); }
+
+  /* Glassmorphic Popovers */
+  .popover {
+    position: fixed; z-index: 70; min-width: 210px;
+    background: var(--bg-glass); backdrop-filter: blur(18px);
+    border: 1px solid var(--hairline-strong); border-radius: 9px;
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.6);
+    padding: 6px; display: flex; flex-direction: column; gap: 2px;
+  }
+  .pop-item {
+    border: none; background: transparent; color: var(--ink-1);
+    padding: 7px 10px; border-radius: 5px; text-align: left; cursor: pointer;
+    font-size: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .pop-item:hover { background: var(--bg-hover); }
+  .pop-item.active { color: var(--accent); font-weight: 600; }
+  .pop-sep { height: 1px; background: var(--hairline); margin: 4px 4px; }
+  .pop-head { padding: 4px 10px; font-size: 11px; color: var(--ink-3); font-weight: 600; }
+  .pop-confirm-body { padding: 6px 10px 8px; font-size: 12px; color: var(--ink-2); line-height: 1.5; max-width: 240px; }
+  .pop-confirm-actions { display: flex; justify-content: flex-end; gap: 6px; padding: 4px 8px 4px; }
+
+  /* Silicon Die-Map Mask Library Overlay */
+  .modal-scrim {
+    position: fixed; inset: 0; background: rgba(4, 6, 10, 0.72);
+    backdrop-filter: blur(6px); z-index: 80;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal {
+    width: 840px; max-width: 100%; max-height: 86vh;
+    background: var(--bg-elevated); border: 1px solid var(--hairline-strong);
+    border-radius: 12px; box-shadow: 0 28px 70px rgba(0,0,0,0.72);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .modal-head {
+    padding: 14px 18px; border-bottom: 1px solid var(--hairline);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .modal-body { flex: 1; min-height: 0; display: flex; }
+  .mask-sidebar {
+    width: 214px; border-right: 1px solid var(--hairline); background: rgba(0,0,0,0.18);
+    padding: 10px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto;
+  }
+  .mask-nav {
+    padding: 8px 10px; border-radius: 6px; cursor: pointer; border: none;
+    background: transparent; color: var(--ink-2); text-align: left; width: 100%;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .mask-nav:hover { background: var(--bg-hover); color: var(--ink-1); }
+  .mask-nav.active { background: var(--accent-soft); color: var(--ink-1); }
+
+  .mask-editor { flex: 1; padding: 16px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+  .phys-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .phys-core {
+    background: var(--bg-panel); border: 1px solid var(--hairline); border-radius: 6px;
+    padding: 7px 9px; display: flex; flex-direction: column; gap: 6px;
+  }
+  .phys-core-head {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 11px; font-weight: 600; color: var(--ink-2); cursor: pointer;
+  }
+  .phys-core-head:hover { color: var(--ink-1); }
+  .thread-pair { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
+  .thread-pair.single { grid-template-columns: 1fr; }
+  .t-btn {
+    height: 22px; border-radius: 4px; border: 1px solid var(--hairline);
+    background: rgba(0,0,0,0.25); color: var(--ink-3);
+    cursor: pointer; font-size: 11px; font-weight: 600; transition: all .1s;
+  }
+  .t-btn.on { background: var(--accent-soft); border-color: var(--accent); color: var(--ink-1); box-shadow: inset 0 0 8px var(--accent-glow); }
+
+  input.clean-input, select.clean-select {
+    height: 28px; padding: 0 9px; border-radius: 6px;
+    background: var(--bg-panel); border: 1px solid var(--hairline-strong);
+    color: var(--ink-1); font-size: 12px; outline: none;
+  }
+
+  .hidden { display: none !important; }
+  .toast {
+    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+    background: var(--bg-glass); backdrop-filter: blur(12px);
+    color: var(--ink-1); border: 1px solid var(--hairline-strong);
+    padding: 8px 16px; border-radius: 999px; font-size: 12px; z-index: 90;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+  }
+</style>
+</head>
+<body data-theme="dark" data-density="standard">
+
+<!-- Minimal Titlebar -->
+<header class="titlebar">
+  <div class="tb-telemetry">
+    <span class="dot good"></span>
+    <span><b>Ryzen 9 9955HX</b> · 16C/32T · AC · LocalSystem</span>
+  </div>
+  <div class="tb-right">
+    <div class="tb-tools">
+      <button class="icon-btn" title="场景与自动化" onclick="toast('场景快控 Flyout')">
+        <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      </button>
+      <button class="icon-btn" title="状态账本 (1 项用户接管)" onclick="toast('StateLedger 状态账本 Flyout')">
+        <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>
+        <span class="mini-dot"></span>
+      </button>
+      <button class="icon-btn" id="appearBtn" title="外观、密度与强调色" onclick="openAppearFlyout(event)">
+        <svg viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/></svg>
+      </button>
+    </div>
+    <button class="cap-btn" title="最小化"><svg viewBox="0 0 12 12"><line x1="1" y1="6" x2="11" y2="6"/></svg></button>
+    <button class="cap-btn" title="最大化"><svg viewBox="0 0 12 12"><rect x="1.5" y="1.5" width="9" height="9"/></svg></button>
+    <button class="cap-btn close" title="关闭"><svg viewBox="0 0 12 12"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg></button>
+  </div>
+</header>
+
+<div class="shell">
+  <!-- Click Logo directly to expand/collapse Nav Rail -->
+  <aside class="nav-rail" id="navRail">
+    <div>
+      <button class="brand-toggle" title="点击展开 / 收起导航" onclick="document.getElementById('navRail').classList.toggle('collapsed')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 21 7 21 17 12 22 3 17 3 7 12 2"/>
+          <polyline points="8 10 15 10 9 15 16 15"/>
+        </svg>
+        <span class="brand-name">Zentwik</span>
+      </button>
+
+      <button class="nav-btn" onclick="toast('首页总览')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg><span class="nav-label">首页总览</span></button>
+      <button class="nav-btn" onclick="toast('CPU 调校')"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg><span class="nav-label">CPU 调校</span></button>
+      <button class="nav-btn" onclick="toast('电源管理')"><svg viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg><span class="nav-label">电源管理</span></button>
+      <button class="nav-btn active"><svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg><span class="nav-label">进程与调度</span></button>
+      <button class="nav-btn" onclick="toast('场景自动化')"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span class="nav-label">场景自动化</span></button>
+      <button class="nav-btn" onclick="toast('方案库')"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span class="nav-label">方案库</span></button>
+    </div>
+    <div>
+      <button class="nav-btn" onclick="toast('能力与诊断')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><span class="nav-label">能力与诊断</span></button>
+      <button class="nav-btn" onclick="toast('系统设置')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span class="nav-label">系统设置</span></button>
+    </div>
+  </aside>
+
+  <!-- Floating Architectural Canvas Sheet -->
+  <div class="canvas-sheet">
+    <!-- Editorial Hero Header -->
+    <div class="hero-bar">
+      <div class="hero-left">
+        <div class="hero-title-row">
+          <span class="hero-title">进程与调度</span>
+          <button class="plan-chip" id="planTrigger" onclick="openPlanMenu(event)">游戏 CCD0 隔离 ▾</button>
+        </div>
+        <div class="hero-sub">3 条持久规则 · 1 项用户接管（点左侧琥珀圆点释放） · 1s 持续监听</div>
+      </div>
+
+      <div class="hero-right">
+        <div class="cmd-search">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input placeholder="搜索进程名或路径…" oninput="setQuery(this.value)" />
+        </div>
+        <button class="btn btn-ghost" onclick="document.getElementById('rulesPane').classList.toggle('collapsed')">规则栏</button>
+        <button class="btn" onclick="openMaskModal()">核心掩码库</button>
+        <button class="btn btn-primary" onclick="toast('已保存并应用调度方案')">保存并应用</button>
+      </div>
+    </div>
+
+    <div class="split-body">
+      <!-- Left Saved Rules Column: Right-aligned pure dot, click amber dot to confirm release! -->
+      <aside class="rules-pane" id="rulesPane">
+        <div class="pane-head">
+          <span class="pane-title">已保存规则 · 3</span>
+          <button class="btn btn-ghost btn-sm" onclick="toast('新建持久规则')">+ 新建</button>
+        </div>
+        <div class="rules-list" id="rulesList"></div>
+      </aside>
+
+      <!-- Main Live Process Grid -->
+      <main class="proc-pane">
+        <div class="proc-subbar">
+          <div class="filter-pills" id="procFilter">
+            <button class="f-pill active" onclick="setFilter('all', this)">全部进程</button>
+            <button class="f-pill" onclick="setFilter('managed', this)">已纳管</button>
+            <button class="f-pill" onclick="setFilter('takeover', this)">用户接管</button>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="toast('已解绑全部受管进程')">全部解绑</button>
+        </div>
+
+        <div class="batch-strip hidden" id="batchStrip">
+          <div><strong id="batchLabel">已选 2 项</strong> <span style="color:var(--ink-2);font-size:12px">· 批量操作</span></div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="btn btn-sm" onclick="openBatchTargetMenu(event)">设调度目标 ▾</button>
+            <button class="btn btn-sm" onclick="openBatchPrioMenu(event)">改优先级 ▾</button>
+            <button class="btn btn-sm btn-primary" onclick="toast('已将选中进程存为持久规则')">存为规则</button>
+            <button class="btn btn-ghost btn-sm" onclick="clearSel()">取消</button>
+          </div>
+        </div>
+
+        <div class="table-scroll">
+          <table class="proc-grid">
+            <thead>
+              <tr>
+                <th style="width:23%" onclick="sortBy('name')">进程名 <span id="sort-name"></span></th>
+                <th style="width:9%" class="num" onclick="sortBy('pid')">PID <span id="sort-pid"></span></th>
+                <th style="width:9%" class="num" onclick="sortBy('cpu')">CPU <span id="sort-cpu">↓</span></th>
+                <th style="width:17%">调度目标</th>
+                <th style="width:11%">优先级</th>
+                <th style="width:31%">进程路径</th>
+              </tr>
+            </thead>
+            <tbody id="procBody"></tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+  </div>
+</div>
+
+<!-- Glass Popover -->
+<div class="popover hidden" id="popover"></div>
+
+<!-- Silicon Die-Map Mask Library Overlay -->
+<div class="modal-scrim hidden" id="maskModal" onclick="closeMaskModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-head">
+      <div style="display:flex;align-items:center;gap:12px">
+        <strong>核心掩码库</strong>
+        <div class="seg" id="topoSimSeg" style="display:inline-flex;background:var(--bg-panel);border:1px solid var(--hairline);border-radius:6px;padding:2px;gap:2px">
+          <button class="f-pill active" onclick="setTopoMode('amd', this)">AMD 16C/32T (2×CCD)</button>
+          <button class="f-pill" onclick="setTopoMode('intel', this)">Intel 24C/32T (8P+16E)</button>
+        </div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="closeMaskModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="mask-sidebar">
+        <button class="btn btn-sm" style="margin-bottom:6px;width:100%" onclick="toast('新建掩码')">+ 新建掩码</button>
+        <button class="mask-nav active"><strong>游戏核心 (CCD0)</strong><span style="font-size:11px;color:var(--ink-2)">CPU Sets · 1 处引用</span></button>
+        <button class="mask-nav"><strong>后台/推流 (CCD1)</strong><span style="font-size:11px;color:var(--ink-2)">Affinity · 1 处引用</span></button>
+        <button class="mask-nav"><strong>仅物理核 (T0)</strong><span style="font-size:11px;color:var(--ink-2)">跳过超线程 · 未引用</span></button>
+      </div>
+      <div class="mask-editor">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:8px">
+            <input class="clean-input" value="游戏核心 (CCD0)" style="font-weight:600;width:180px" />
+            <select class="clean-select"><option>CPU Sets (软约束)</option><option>Affinity (硬绑定)</option></select>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm" onclick="maskSelectPreset('t0')">仅主线程 T0</button>
+            <button class="btn btn-sm" onclick="maskSelectPreset('c0')">全选簇 0</button>
+            <button class="btn btn-sm" onclick="maskSelectPreset('all')">全选</button>
+            <button class="btn btn-sm" onclick="maskSelectPreset('none')">清空</button>
+          </div>
+        </div>
+        <div id="topoContainer" style="display:flex;flex-direction:column;gap:14px"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding-top:10px;border-top:1px solid var(--hairline)">
+          <span style="font-size:12px;color:var(--ink-2)">逻辑掩码：<code id="modalHex">0x0000FFFF</code> · 已选 <strong id="modalCount">16</strong> 个逻辑线程</span>
+          <div style="display:flex;gap:8px">
+            <button class="btn" onclick="closeMaskModal()">取消</button>
+            <button class="btn btn-primary" onclick="closeMaskModal(); toast('已保存掩码并同步更新引用规则')">保存掩码</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast hidden" id="toastEl"></div>
+
+<script>
+  const rules = [
+    { id: 1, name: 'Cyberpunk2077.exe', target: '游戏核心 (CCD0)', prio: 'High', state: 'aligned' },
+    { id: 2, name: 'obs64.exe', target: '后台/推流 (CCD1)', prio: 'AboveNormal', state: 'takeover' },
+    { id: 3, name: 'Valorant-Win64-Shipping.exe', target: '游戏核心 (CCD0)', prio: 'High', state: 'offline' }
+  ];
+
+  const procs = [
+    { name: 'blender.exe', pid: 18240, cpu: 48.3, target: '系统默认', prio: 'Normal', path: 'C:\\Program Files\\Blender Foundation\\Blender 4.2\\blender.exe', state: 'none' },
+    { name: 'Cyberpunk2077.exe', pid: 14820, cpu: 24.1, target: '游戏核心 (CCD0)', prio: 'High', path: 'D:\\Games\\Cyberpunk 2077\\bin\\x64\\Cyberpunk2077.exe', state: 'aligned' },
+    { name: 'obs64.exe', pid: 9312, cpu: 6.8, target: '后台/推流 (CCD1)', prio: 'AboveNormal', path: 'C:\\Program Files\\obs-studio\\bin\\64bit\\obs64.exe', state: 'takeover' },
+    { name: 'chrome.exe', pid: 4120, cpu: 2.4, target: '系统默认', prio: 'Normal', path: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', state: 'none' },
+    { name: 'Code.exe', pid: 7740, cpu: 1.9, target: '系统默认', prio: 'Normal', path: 'C:\\Users\\Motu\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe', state: 'none' },
+    { name: 'explorer.exe', pid: 3104, cpu: 0.6, target: '系统默认', prio: 'Normal', path: 'C:\\Windows\\explorer.exe', state: 'none' }
+  ];
+
+  const maskOptions = ['系统默认', '游戏核心 (CCD0)', '后台/推流 (CCD1)', '仅物理核 (T0)'];
+  const prioOptions = ['EcoQoS', 'BelowNormal', 'Normal', 'AboveNormal', 'High'];
+
+  let filterMode = 'all', query = '', sortKey = 'cpu', sortAsc = false;
+  const selected = new Set();
+  let lastClickedIdx = null;
+
+  /* Saved Rules: Dot stays on far RIGHT; clicking amber dot pops release confirmation! */
+  function renderRules() {
+    const el = document.getElementById('rulesList');
+    el.innerHTML = rules.map(r => {
+      const dotCls = r.state === 'takeover' ? 'warn' : r.state === 'offline' ? 'muted' : 'good';
+      const dotTip = r.state === 'takeover' ? '外部已接管，点击确认是否释放' : r.state === 'offline' ? '进程未运行' : '生效中';
+      const dotBtn = r.state === 'takeover'
+        ? `<button class="dot-hit interactive" title="${dotTip}" onclick="confirmRelease(event, ${r.id})"><span class="dot warn"></span></button>`
+        : `<span class="dot-hit" title="${dotTip}"><span class="dot ${dotCls}"></span></span>`;
+
+      return `
+        <div class="rule-item" oncontextmenu="event.preventDefault(); openRuleMenu(event, ${r.id})">
+          <div class="rule-top">
+            <span class="rule-name" title="${r.name}">${r.name}</span>
+            ${dotBtn}
+          </div>
+          <div class="rule-meta">${r.target} · ${r.prio}</div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function confirmRelease(e, id) {
+    e.stopPropagation();
+    const r = rules.find(x => x.id === id);
+    const rect = e.currentTarget.getBoundingClientRect();
+    showPopover(rect.right + 8, rect.top - 4, `
+      <div class="pop-head">用户接管 · ${r.name}</div>
+      <div class="pop-confirm-body">检测到该进程亲和性被外部修改，自动化已暂停覆盖。是否释放接管并恢复规则控制？</div>
+      <div class="pop-confirm-actions">
+        <button class="btn btn-sm btn-ghost" onclick="closePop()">暂不</button>
+        <button class="btn btn-sm btn-primary" onclick="closePop(); releaseRule(${r.id})">释放接管</button>
+      </div>
+    `);
+  }
+
+  function openRuleMenu(e, id) {
+    e.stopPropagation();
+    const r = rules.find(x => x.id === id);
+    showPopover(e.clientX, e.clientY, `
+      <div class="pop-head">${r.name}</div>
+      ${r.state==='takeover' ? `<button class="pop-item" onclick="closePop(); releaseRule(${r.id})">释放用户接管</button>` : ''}
+      <button class="pop-item" onclick="closePop(); toast('编辑规则 ${r.name}')">编辑规则…</button>
+      <button class="pop-item" style="color:var(--bad)" onclick="closePop(); toast('删除规则 ${r.name}')">删除规则</button>
+    `);
+  }
+
+  function releaseRule(id) {
+    const r = rules.find(x => x.id === id);
+    if (r) r.state = 'aligned';
+    const p = procs.find(x => x.name === r.name);
+    if (p) p.state = 'aligned';
+    renderRules(); renderProcs();
+    toast(`已释放 ${r.name} 的用户接管`);
+  }
+
+  function renderProcs() {
+    const rows = procs
+      .map((p, idx) => ({ p, idx }))
+      .filter(({ p }) => {
+        if (filterMode === 'managed' && p.state === 'none') return false;
+        if (filterMode === 'takeover' && p.state !== 'takeover') return false;
+        if (query && !p.name.toLowerCase().includes(query) && !p.path.toLowerCase().includes(query)) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const va = a.p[sortKey], vb = b.p[sortKey];
+        if (typeof va === 'number') return sortAsc ? va - vb : vb - va;
+        return sortAsc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
+      });
+
+    const body = document.getElementById('procBody');
+    body.innerHTML = '';
+    rows.forEach(({ p, idx }) => {
+      const tr = document.createElement('tr');
+      if (selected.has(idx)) tr.classList.add('selected');
+      if (p.state !== 'none') tr.classList.add('managed');
+
+      /* Status dot hugs directly next to the process name! */
+      const statusDot = p.state === 'takeover'
+        ? `<span class="dot warn" title="用户接管（外部修改）"></span>`
+        : p.state === 'aligned'
+        ? `<span class="dot good" title="已对齐规则"></span>`
+        : '';
+
+      tr.innerHTML = `
+        <td>
+          <div class="proc-name-wrap">
+            <span class="proc-name-text" title="${p.name}">${p.name}</span>
+            ${statusDot}
+          </div>
+        </td>
+        <td class="num" style="color:var(--ink-2)">${p.pid}</td>
+        <td class="num" style="color:var(--ink-2)">${p.cpu.toFixed(1)}%</td>
+        <td><span class="editable-cell ${p.target!=='系统默认'?'customized':''}" onclick="openCellMenu(event, ${idx}, 'target')">${p.target}</span></td>
+        <td><span class="editable-cell ${p.prio!=='Normal'?'customized':''}" onclick="openCellMenu(event, ${idx}, 'prio')">${p.prio}</span></td>
+        <td style="color:var(--ink-3)" title="${p.path}">${p.path}</td>
+      `;
+
+      tr.onclick = e => {
+        if (e.target.closest('.editable-cell')) return;
+        if (e.ctrlKey || e.metaKey) selected.has(idx) ? selected.delete(idx) : selected.add(idx);
+        else if (e.shiftKey && lastClickedIdx !== null) {
+          const [s, en] = [Math.min(lastClickedIdx, idx), Math.max(lastClickedIdx, idx)];
+          for (let k = s; k <= en; k++) selected.add(k);
+        } else { selected.clear(); selected.add(idx); }
+        lastClickedIdx = idx;
+        renderProcs();
+      };
+
+      tr.oncontextmenu = e => {
+        e.preventDefault();
+        if (!selected.has(idx)) { selected.clear(); selected.add(idx); renderProcs(); }
+        openContextMenu(e, idx);
+      };
+
+      body.appendChild(tr);
+    });
+
+    const bs = document.getElementById('batchStrip');
+    bs.classList.toggle('hidden', selected.size < 2);
+    document.getElementById('batchLabel').textContent = `已选中 ${selected.size} 个进程`;
+  }
+
+  function showPopover(x, y, html) {
+    const pop = document.getElementById('popover');
+    pop.innerHTML = html;
+    pop.classList.remove('hidden');
+    const vw = window.innerWidth, vh = window.innerHeight;
+    pop.style.left = Math.min(x, vw - 260) + 'px';
+    pop.style.top = Math.min(y, vh - 260) + 'px';
+  }
+  function closePop() { document.getElementById('popover').classList.add('hidden'); }
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#popover') && !e.target.closest('.editable-cell') && !e.target.closest('#appearBtn') && !e.target.closest('#planTrigger') && !e.target.closest('.dot-hit')) closePop();
+  });
+
+  function openPlanMenu(e) {
+    e.stopPropagation();
+    const r = e.currentTarget.getBoundingClientRect();
+    showPopover(r.left, r.bottom + 6, `
+      <div class="pop-head">切换参考调度方案</div>
+      <button class="pop-item active" onclick="closePop(); document.getElementById('planTrigger').textContent='游戏 CCD0 隔离 ▾'"><span>游戏 CCD0 隔离</span>✓</button>
+      <button class="pop-item" onclick="closePop(); document.getElementById('planTrigger').textContent='直播推流分流 ▾'"><span>直播推流分流</span></button>
+    `);
+  }
+
+  function openCellMenu(e, idx, field) {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const p = procs[idx];
+    if (field === 'target') {
+      showPopover(rect.left, rect.bottom + 4, `
+        <div class="pop-head">切换调度目标</div>
+        ${maskOptions.map(m => `<button class="pop-item ${p.target===m?'active':''}" onclick="setProcField(${idx},'target','${m}')"><span>${m}</span>${p.target===m?'✓':''}</button>`).join('')}
+        <div class="pop-sep"></div>
+        <button class="pop-item" onclick="closePop(); openMaskModal()">管理核心掩码库…</button>
+      `);
+    } else {
+      showPopover(rect.left, rect.bottom + 4, `
+        <div class="pop-head">切换优先级</div>
+        ${prioOptions.map(pr => `<button class="pop-item ${p.prio===pr?'active':''}" onclick="setProcField(${idx},'prio','${pr}')"><span>${pr}</span>${p.prio===pr?'✓':''}</button>`).join('')}
+      `);
+    }
+  }
+
+  function setProcField(idx, field, val) {
+    procs[idx][field] = val;
+    if (field === 'target') procs[idx].state = val === '系统默认' ? 'none' : 'aligned';
+    closePop(); renderProcs();
+    toast(`${procs[idx].name} 已就地更新 → ${val}`);
+  }
+
+  function openContextMenu(e, idx) {
+    const p = procs[idx];
+    const countText = selected.size > 1 ? `已选 ${selected.size} 项` : p.name;
+    const dirPath = p.path.replace(/\\[^\\]+$/, '');
+    showPopover(e.clientX, e.clientY, `
+      <div class="pop-head">${countText}</div>
+      <button class="pop-item" onclick="openBatchTargetMenuAt(${e.clientX},${e.clientY})">分配核心掩码 →</button>
+      <button class="pop-item" onclick="openBatchPrioMenuAt(${e.clientX},${e.clientY})">设置优先级 →</button>
+      <button class="pop-item" onclick="closePop(); toast('已保存为持久调度规则')">存为持久规则</button>
+      <div class="pop-sep"></div>
+      <button class="pop-item" onclick="closePop(); toast('在资源管理器中打开：${dirPath.replace(/\\\\/g,'/')}')">打开进程所在目录</button>
+      <button class="pop-item" onclick="closePop(); toast('已复制进程路径')">复制进程路径</button>
+      <button class="pop-item" style="color:var(--bad)" onclick="closePop(); toast('已解绑选中进程')">解绑调度</button>
+    `);
+  }
+
+  function openBatchTargetMenu(e) { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); openBatchTargetMenuAt(r.left, r.bottom + 4); }
+  function openBatchTargetMenuAt(x, y) {
+    showPopover(x, y, `<div class="pop-head">批量分配掩码 (${selected.size}项)</div>` +
+      maskOptions.map(m => `<button class="pop-item" onclick="applyBatch('target','${m}')">${m}</button>`).join(''));
+  }
+  function openBatchPrioMenu(e) { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); openBatchPrioMenuAt(r.left, r.bottom + 4); }
+  function openBatchPrioMenuAt(x, y) {
+    showPopover(x, y, `<div class="pop-head">批量修改优先级 (${selected.size}项)</div>` +
+      prioOptions.map(pr => `<button class="pop-item" onclick="applyBatch('prio','${pr}')">${pr}</button>`).join(''));
+  }
+  function applyBatch(field, val) {
+    selected.forEach(i => { procs[i][field] = val; if (field === 'target') procs[i].state = val === '系统默认' ? 'none' : 'aligned'; });
+    closePop(); renderProcs();
+    toast(`已批量应用到 ${selected.size} 个进程`);
+  }
+
+  function openAppearFlyout(e) {
+    e.stopPropagation();
+    const r = e.currentTarget.getBoundingClientRect();
+    const d = document.body.dataset.density, th = document.body.dataset.theme;
+    showPopover(r.right - 220, r.bottom + 6, `
+      <div class="pop-head">外观与密度</div>
+      <div style="padding:4px 8px;display:flex;gap:4px">
+        <button class="btn btn-sm ${d==='relaxed'?'btn-primary':''}" onclick="setBody('density','relaxed')">宽松</button>
+        <button class="btn btn-sm ${d==='standard'?'btn-primary':''}" onclick="setBody('density','standard')">标准</button>
+        <button class="btn btn-sm ${d==='compact'?'btn-primary':''}" onclick="setBody('density','compact')">紧凑</button>
+      </div>
+      <div style="padding:4px 8px;display:flex;gap:4px">
+        <button class="btn btn-sm ${th==='dark'?'btn-primary':''}" onclick="setBody('theme','dark')">深色</button>
+        <button class="btn btn-sm ${th==='light'?'btn-primary':''}" onclick="setBody('theme','light')">浅色</button>
+      </div>
+    `);
+  }
+  function setBody(k, v) { document.body.dataset[k] = v; closePop(); }
+
+  function sortBy(k) {
+    if (sortKey === k) sortAsc = !sortAsc; else { sortKey = k; sortAsc = k === 'name'; }
+    ['name','pid','cpu'].forEach(x => document.getElementById('sort-' + x).textContent = x === sortKey ? (sortAsc ? '↑' : '↓') : '');
+    renderProcs();
+  }
+  function setFilter(m, btn) { filterMode = m; document.querySelectorAll('#procFilter button').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderProcs(); }
+  function setQuery(q) { query = q.trim().toLowerCase(); renderProcs(); }
+  function clearSel() { selected.clear(); renderProcs(); }
+
+  let topoMode = 'amd';
+  const activeThreads = new Set(Array.from({length: 16}, (_, i) => i));
+  function openMaskModal() { document.getElementById('maskModal').classList.remove('hidden'); renderTopo(); }
+  function closeMaskModal(e) { if (!e || e.target.id === 'maskModal') document.getElementById('maskModal').classList.add('hidden'); }
+  function setTopoMode(m, btn) {
+    topoMode = m;
+    document.querySelectorAll('#topoSimSeg button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderTopo();
+  }
+  function maskSelectPreset(kind) {
+    activeThreads.clear();
+    getClusters().forEach((cl, ci) => {
+      cl.cores.forEach(c => {
+        if (kind === 'all') c.threads.forEach(t => activeThreads.add(t));
+        if (kind === 't0') activeThreads.add(c.threads[0]);
+        if (kind === 'c0' && ci === 0) c.threads.forEach(t => activeThreads.add(t));
+      });
+    });
+    renderTopo();
+  }
+  function getClusters() {
+    if (topoMode === 'amd') {
+      return [
+        { title: 'CCD 0 · 8 物理核 / 16 线程 (SMT)', cores: Array.from({length:8}, (_,i)=>({ name:`C${i}`, threads:[i*2, i*2+1] })) },
+        { title: 'CCD 1 · 8 物理核 / 16 线程 (SMT)', cores: Array.from({length:8}, (_,i)=>({ name:`C${i+8}`, threads:[(i+8)*2, (i+8)*2+1] })) }
+      ];
+    }
+    return [
+      { title: 'P-Core 性能核簇 · 8 物理核 / 16 线程 (HT 开启)', cores: Array.from({length:8}, (_,i)=>({ name:`P${i}`, threads:[i*2, i*2+1] })) },
+      { title: 'E-Core 能效核簇 · 16 物理核 / 16 线程 (无 HT)', cores: Array.from({length:16}, (_,i)=>({ name:`E${i}`, threads:[16+i] })) }
+    ];
+  }
+  function togglePhysicalCore(threads) {
+    const allOn = threads.every(t => activeThreads.has(t));
+    threads.forEach(t => allOn ? activeThreads.delete(t) : activeThreads.add(t));
+    renderTopo();
+  }
+  function toggleThread(t) { activeThreads.has(t) ? activeThreads.delete(t) : activeThreads.add(t); renderTopo(); }
+  function renderTopo() {
+    document.getElementById('topoContainer').innerHTML = getClusters().map(cl => `
+      <div class="cluster-section">
+        <div style="font-size:12px;font-weight:600;color:var(--ink-2)">${cl.title}</div>
+        <div class="phys-grid">
+          ${cl.cores.map(c => `
+            <div class="phys-core">
+              <div class="phys-core-head" onclick="togglePhysicalCore([${c.threads.join(',')}])">
+                <span>${c.name}</span>
+                <span style="font-size:10px;color:var(--ink-3)">${c.threads.length > 1 ? 'SMT' : '单线程'}</span>
+              </div>
+              <div class="thread-pair ${c.threads.length === 1 ? 'single' : ''}">
+                ${c.threads.map((t, ti) => `<button class="t-btn ${activeThreads.has(t)?'on':''}" onclick="toggleThread(${t})">T${ti} (${t})</button>`).join('')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `).join('');
+    let lo = 0n;
+    activeThreads.forEach(t => lo |= (1n << BigInt(t)));
+    document.getElementById('modalHex').textContent = '0x' + lo.toString(16).toUpperCase().padStart(8, '0');
+    document.getElementById('modalCount').textContent = activeThreads.size;
+  }
+
+  function toast(msg) {
+    const el = document.getElementById('toastEl');
+    el.textContent = msg; el.classList.remove('hidden');
+    clearTimeout(window._t); window._t = setTimeout(() => el.classList.add('hidden'), 2300);
+  }
+
+  renderRules();
+  renderProcs();
+</script>
+</body>
+</html>

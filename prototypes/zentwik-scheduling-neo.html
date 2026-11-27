@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Zentwik · 进程与调度（方案闭环 & 克制平权版）</title>
+<style>
+  :root {
+    --bg-void: #05070b;
+    --bg-surface: #0a0d13;
+    --bg-elevated: #111621;
+    --bg-glass: rgba(17, 22, 33, 0.86);
+    --bg-dock: rgba(13, 17, 25, 0.8);
+    --bg-hover: rgba(255, 255, 255, 0.042);
+    --bg-row-alt: rgba(255, 255, 255, 0.014);
+    --bg-selected: rgba(59, 130, 246, 0.11);
+
+    --hairline: rgba(255, 255, 255, 0.055);
+    --hairline-strong: rgba(255, 255, 255, 0.13);
+
+    --ink-1: #eef2f8;
+    --ink-2: #9aa6ba;
+    --ink-3: #56647a;
+
+    --accent: #3b82f6;
+    --accent-soft: rgba(59, 130, 246, 0.15);
+    --accent-glow: rgba(59, 130, 246, 0.25);
+
+    --good: #22c55e;
+    --warn: #f59e0b;
+    --bad: #ef4444;
+
+    --row-pad-y: 9px;
+    --font-size: 13px;
+    --mono: "JetBrains Mono", "Cascadia Mono", "Consolas", monospace;
+  }
+
+  [data-theme="light"] {
+    --bg-void: #e9edf4;
+    --bg-surface: #f8fafd;
+    --bg-elevated: #ffffff;
+    --bg-glass: rgba(255, 255, 255, 0.9);
+    --bg-dock: rgba(248, 250, 253, 0.88);
+    --bg-hover: rgba(15, 23, 42, 0.04);
+    --bg-row-alt: rgba(15, 23, 42, 0.018);
+    --bg-selected: rgba(59, 130, 246, 0.09);
+    --hairline: rgba(15, 23, 42, 0.07);
+    --hairline-strong: rgba(15, 23, 42, 0.15);
+    --ink-1: #0f172a;
+    --ink-2: #475569;
+    --ink-3: #94a3b8;
+  }
+
+  [data-density="compact"] { --row-pad-y: 5px; --font-size: 12px; }
+  [data-density="relaxed"] { --row-pad-y: 12px; --font-size: 13.5px; }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: var(--bg-void); color: var(--ink-1);
+    font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+    font-size: var(--font-size); line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body::before {
+    content: ""; position: fixed; top: -220px; left: 8%; width: 720px; height: 420px;
+    background: radial-gradient(ellipse at center, var(--accent-glow) 0%, transparent 72%);
+    opacity: 0.3; pointer-events: none; z-index: 0;
+  }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.16); border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.34); }
+
+  /* Minimal Titlebar */
+  .titlebar {
+    height: 36px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 0 0 18px; user-select: none; position: relative; z-index: 20;
+  }
+  .tb-telemetry {
+    display: inline-flex; align-items: center; gap: 9px;
+    font-size: 11px; color: var(--ink-3); letter-spacing: 0.25px;
+  }
+  .tb-telemetry b { color: var(--ink-2); font-weight: 600; }
+
+  .dot { width: 5px; height: 5px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+  .dot.good { background: var(--good); opacity: 0.85; }
+  .dot.warn { background: var(--warn); box-shadow: 0 0 6px rgba(245, 158, 11, 0.55); }
+  .dot.muted { background: transparent; border: 1.3px solid var(--ink-3); opacity: 0.55; }
+
+  .tb-right { display: flex; align-items: center; height: 100%; }
+  .tb-tools { display: flex; height: 100%; margin-right: 4px; }
+  .icon-btn, .cap-btn {
+    width: 38px; height: 100%; border: none; background: transparent; color: var(--ink-2);
+    cursor: pointer; display: flex; align-items: center; justify-content: center; position: relative;
+    transition: color .14s, background .14s;
+  }
+  .cap-btn { width: 44px; }
+  .icon-btn:hover, .cap-btn:hover { color: var(--ink-1); background: var(--bg-hover); }
+  .cap-btn.close:hover { background: #dc2626; color: #fff; }
+  .icon-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .cap-btn svg { width: 10px; height: 10px; stroke: currentColor; fill: none; stroke-width: 1.4; }
+  .mini-dot { position: absolute; top: 9px; right: 9px; width: 5px; height: 5px; border-radius: 50%; background: var(--warn); }
+
+  /* Shell Layout */
+  .shell { height: calc(100vh - 36px); display: flex; position: relative; z-index: 1; }
+
+  /* Nav Rail — Click Logo directly to toggle */
+  .nav-rail {
+    width: 162px; min-width: 162px; padding: 8px 10px 14px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    transition: width .2s cubic-bezier(.22,1,.36,1), min-width .2s cubic-bezier(.22,1,.36,1);
+  }
+  .nav-rail.collapsed { width: 56px; min-width: 56px; padding: 8px 8px 14px; }
+  .brand-toggle {
+    width: 100%; border: none; background: transparent; color: var(--ink-1);
+    display: flex; align-items: center; gap: 10px; padding: 8px 10px; margin-bottom: 14px;
+    border-radius: 9px; cursor: pointer; overflow: hidden; transition: background .14s;
+  }
+  .brand-toggle:hover { background: var(--bg-hover); }
+  .brand-toggle svg { width: 22px; height: 22px; flex-shrink: 0; color: var(--accent); filter: drop-shadow(0 0 10px var(--accent-glow)); }
+  .brand-name { font-weight: 700; font-size: 14px; letter-spacing: 0.4px; white-space: nowrap; }
+  .nav-rail.collapsed .brand-toggle { justify-content: center; padding: 8px 0; }
+  .nav-rail.collapsed .brand-name, .nav-rail.collapsed .nav-label { display: none; }
+
+  .nav-btn {
+    width: 100%; height: 34px; border: none; background: transparent; color: var(--ink-2);
+    border-radius: 8px; padding: 0 10px; cursor: pointer;
+    display: flex; align-items: center; gap: 10px; font-size: var(--font-size);
+    transition: background .12s, color .12s; margin-bottom: 3px; position: relative;
+  }
+  .nav-rail.collapsed .nav-btn { justify-content: center; padding: 0; }
+  .nav-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.65; flex-shrink: 0; }
+  .nav-btn:hover { background: var(--bg-hover); color: var(--ink-1); }
+  .nav-btn.active { background: rgba(255, 255, 255, 0.04); color: var(--ink-1); font-weight: 600; }
+  .nav-btn.active::before {
+    content: ""; position: absolute; left: 0; top: 9px; bottom: 9px; width: 2.5px;
+    border-radius: 2px; background: var(--accent);
+  }
+  .nav-btn.active svg { color: var(--accent); }
+
+  /* Single Continuous Architectural Plane */
+  .stage {
+    flex: 1; min-width: 0; margin: 0 10px 10px 0;
+    background: var(--bg-surface);
+    border: 1px solid var(--hairline);
+    border-radius: 14px;
+    display: flex; flex-direction: column; overflow: hidden;
+    position: relative;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.48);
+  }
+
+  /* Single Unified Command Header */
+  .cmd-header {
+    padding: 14px 22px;
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    flex-wrap: wrap;
+    background: linear-gradient(180deg, rgba(255,255,255,0.018) 0%, transparent 100%);
+  }
+  .cmd-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .page-title { font-size: 19px; font-weight: 700; letter-spacing: -0.3px; }
+
+  /* Plan Anchor Pill (Unified across Tuning / Power / Process) */
+  .plan-pill {
+    border: 1px solid var(--hairline-strong); background: rgba(255,255,255,0.03); color: var(--ink-1);
+    padding: 4px 11px; border-radius: 999px; font-size: 12px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 7px;
+    transition: all .14s;
+  }
+  .plan-pill:hover { border-color: rgba(255,255,255,0.24); background: var(--bg-hover); }
+  .dirty-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--warn); }
+  .live-whisper { font-size: 11.5px; color: var(--ink-3); margin-left: 2px; }
+
+  .cmd-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+  .seg-filter {
+    display: inline-flex; padding: 2px; border-radius: 999px;
+    background: rgba(255,255,255,0.028); border: 1px solid var(--hairline);
+  }
+  .seg-btn {
+    border: none; background: transparent; color: var(--ink-3);
+    padding: 4px 10px; border-radius: 999px; font-size: 11.5px; cursor: pointer;
+    transition: all .14s;
+  }
+  .seg-btn:hover { color: var(--ink-1); }
+  .seg-btn.active { background: var(--bg-elevated); color: var(--ink-1); font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,0.25); }
+
+  .cmd-search { position: relative; display: flex; align-items: center; }
+  .cmd-search svg {
+    position: absolute; left: 10px; width: 13px; height: 13px;
+    stroke: var(--ink-3); fill: none; stroke-width: 1.8; pointer-events: none;
+  }
+  .cmd-search input {
+    height: 30px; width: 184px; padding: 0 12px 0 29px; border-radius: 999px;
+    background: rgba(255,255,255,0.028); border: 1px solid var(--hairline);
+    color: var(--ink-1); font-size: 12px; outline: none; transition: width .18s, border-color .14s, background .14s;
+  }
+  .cmd-search input:focus { width: 235px; border-color: var(--accent); background: var(--bg-elevated); }
+
+  .btn {
+    height: 30px; padding: 0 12px; border-radius: 8px;
+    border: 1px solid var(--hairline-strong); background: rgba(255,255,255,0.02);
+    color: var(--ink-1); cursor: pointer; font-size: 12px;
+    display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+    transition: background .12s, border-color .12s, opacity .12s, transform .08s;
+  }
+  .btn:hover:not(:disabled) { background: var(--bg-hover); border-color: rgba(255,255,255,0.2); }
+  .btn:active:not(:disabled) { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn.dock-active { border-color: var(--accent); background: var(--accent-soft); color: var(--ink-1); }
+  .btn-primary {
+    background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600;
+    box-shadow: 0 4px 16px var(--accent-glow);
+  }
+  .btn-primary:hover:not(:disabled) { filter: brightness(1.08); background: var(--accent); }
+  .btn-ghost { border-color: transparent; background: transparent; color: var(--ink-2); }
+  .btn-ghost:hover:not(:disabled) { color: var(--ink-1); background: var(--bg-hover); border-color: transparent; }
+  .btn-sm { height: 24px; padding: 0 9px; font-size: 11.5px; border-radius: 6px; }
+
+  /* Workspace Body */
+  .stage-body { flex: 1; min-height: 0; display: flex; position: relative; overflow: hidden; }
+
+  /* Process Stream — Restrained, Equalized, Hover-Revealed Controls */
+  .stream-pane {
+    flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden;
+    padding: 0 14px 14px;
+  }
+  .stream-head {
+    display: grid;
+    grid-template-columns: minmax(240px, 1fr) 74px 74px 160px 98px;
+    align-items: center; gap: 10px;
+    padding: 6px 14px 8px;
+    font-size: 11px; font-weight: 600; color: var(--ink-3); letter-spacing: 0.4px;
+    user-select: none;
+  }
+  .stream-head .sortable { cursor: pointer; transition: color .12s; }
+  .stream-head .sortable:hover { color: var(--ink-1); }
+  .num { text-align: right; }
+
+  .stream-scroll { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding-right: 2px; }
+
+  .proc-row {
+    display: grid;
+    grid-template-columns: minmax(240px, 1fr) 74px 74px 160px 98px;
+    align-items: center; gap: 10px;
+    padding: var(--row-pad-y) 14px;
+    border-radius: 10px;
+    cursor: default; position: relative;
+    transition: background .12s ease, opacity .15s ease;
+  }
+  .proc-row:nth-child(even) { background: var(--bg-row-alt); }
+  .proc-row:hover { background: var(--bg-hover); }
+  .proc-row.selected { background: var(--bg-selected); }
+  .proc-row.selected::before {
+    content: ""; position: absolute; left: 2px; top: 8px; bottom: 8px; width: 2.5px;
+    border-radius: 2px; background: var(--accent);
+  }
+  .proc-row.dimmed { opacity: 0.34; }
+  .proc-row.rule-highlight { background: rgba(59, 130, 246, 0.08); }
+
+  /* Equalized typography: no harsh contrast gap between unmanaged and managed */
+  .proc-id { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .proc-name-line { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+  .proc-name {
+    font-weight: 500; color: var(--ink-1); opacity: 0.88;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .proc-row.managed .proc-name { opacity: 1; font-weight: 500; }
+  .proc-path {
+    font-family: var(--mono); font-size: 10.8px; color: var(--ink-3);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .proc-row:hover .proc-path { color: var(--ink-2); }
+
+  .pid-cell { font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); text-align: right; }
+  .cpu-cell { font-family: var(--mono); font-size: 12.5px; color: var(--ink-2); text-align: right; font-weight: 500; }
+  .cpu-cell.hot { color: var(--ink-1); }
+
+  /* Flat at rest, interactive capsule only on hover */
+  .cell-btn {
+    display: inline-flex; align-items: center; max-width: 100%;
+    padding: 4px 8px; margin-left: -8px; border-radius: 7px;
+    border: 1px solid transparent; background: transparent;
+    color: var(--ink-3); font-size: 12.5px; cursor: pointer;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    transition: background .12s, color .12s, border-color .12s;
+  }
+  .cell-btn.set { color: var(--ink-2); }
+  .cell-btn.takeover { color: #fbbf24; }
+  .cell-btn:hover { background: rgba(255,255,255,0.06); color: var(--ink-1); border-color: var(--hairline); }
+
+  /* Floating Bottom Batch Island */
+  .batch-island {
+    position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
+    z-index: 30;
+    background: var(--bg-glass); backdrop-filter: blur(20px);
+    border: 1px solid var(--hairline-strong); border-radius: 999px;
+    padding: 6px 8px 6px 16px;
+    display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.58);
+  }
+
+  /* Right Floating Glass Strategy Dock */
+  .strategy-dock {
+    width: 344px; min-width: 344px;
+    margin: 2px 14px 14px 0;
+    background: var(--bg-dock);
+    backdrop-filter: blur(22px);
+    border: 1px solid var(--hairline);
+    border-radius: 12px;
+    display: flex; flex-direction: column; overflow: hidden;
+    transition: width .22s cubic-bezier(.22,1,.36,1), min-width .22s cubic-bezier(.22,1,.36,1);
+    box-shadow: 0 16px 40px rgba(0,0,0,0.35);
+  }
+  .strategy-dock.wide { width: 452px; min-width: 452px; }
+  .strategy-dock.collapsed { display: none; }
+
+  .dock-tabs {
+    padding: 10px 12px; border-bottom: 1px solid var(--hairline);
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .dock-seg {
+    display: inline-flex; padding: 2px; border-radius: 8px;
+    background: rgba(0,0,0,0.22); border: 1px solid var(--hairline);
+  }
+  .dock-tab {
+    border: none; background: transparent; color: var(--ink-2);
+    padding: 5px 11px; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 500;
+    transition: all .14s;
+  }
+  .dock-tab.active { background: var(--bg-elevated); color: var(--ink-1); font-weight: 600; }
+
+  .dock-body { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+  .dock-context-note {
+    font-size: 11px; color: var(--ink-3); padding: 2px 4px 4px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+  /* Rule Card */
+  .rule-card {
+    padding: 10px 12px; border-radius: 10px;
+    background: rgba(255,255,255,0.02); border: 1px solid transparent;
+    cursor: pointer; display: flex; flex-direction: column; gap: 5px;
+    transition: all .14s;
+  }
+  .rule-card:hover { background: var(--bg-hover); border-color: var(--hairline); }
+  .rule-card.filtering { background: var(--accent-soft); border-color: var(--accent); }
+  .rule-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .rule-name { font-weight: 600; font-size: 13px; color: var(--ink-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rule-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--ink-2); }
+  .rule-actions { display: none; gap: 4px; }
+  .rule-card:hover .rule-actions { display: flex; }
+  .mini-icon-act {
+    border: none; background: rgba(255,255,255,0.06); color: var(--ink-2);
+    width: 20px; height: 20px; border-radius: 5px; cursor: pointer; font-size: 11px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .mini-icon-act:hover { color: var(--ink-1); background: rgba(255,255,255,0.14); }
+  .mini-icon-act.del:hover { color: var(--bad); background: rgba(239, 68, 68, 0.15); }
+
+  .dot-hit {
+    width: 20px; height: 20px; border-radius: 50%; border: none; background: transparent;
+    display: inline-flex; align-items: center; justify-content: center; padding: 0; flex-shrink: 0;
+  }
+  .dot-hit.interactive { cursor: pointer; }
+  .dot-hit.interactive:hover { background: rgba(245, 158, 11, 0.18); }
+
+  /* Mask Library Layer 1 — Neutral Monochrome CS/AM Tags */
+  .mask-card {
+    padding: 12px 13px; border-radius: 10px;
+    background: rgba(255,255,255,0.022); border: 1px solid var(--hairline);
+    cursor: pointer; display: flex; flex-direction: column; gap: 9px;
+    transition: all .14s;
+  }
+  .mask-card:hover { background: var(--bg-hover); border-color: var(--hairline-strong); transform: translateY(-1px); }
+  .mask-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .mask-card-name { font-size: 13.5px; font-weight: 600; color: var(--ink-1); }
+  .type-tag {
+    font-family: var(--mono); font-size: 10px; font-weight: 600;
+    padding: 2px 6px; border-radius: 4px; border: 1px solid var(--hairline-strong); color: var(--ink-3);
+  }
+  .mask-range-pill {
+    display: inline-flex; align-items: center; gap: 6px; align-self: flex-start;
+    padding: 4px 8px; border-radius: 6px; background: var(--accent-soft);
+    font-family: var(--mono); font-size: 11.5px; color: var(--ink-1);
+  }
+  .mask-range-pill span.lbl { color: var(--ink-2); font-size: 10.5px; letter-spacing: 0.4px; }
+  .mask-card-foot { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--ink-3); }
+
+  /* Mask Library Layer 2: Silicon Brush Canvas Editor */
+  .editor-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding-bottom: 6px; border-bottom: 1px solid var(--hairline);
+  }
+  .field-label { font-size: 11px; font-weight: 600; color: var(--ink-3); letter-spacing: 0.4px; margin-top: 4px; }
+  .clean-input {
+    width: 100%; height: 32px; padding: 0 10px; border-radius: 7px;
+    background: rgba(0,0,0,0.22); border: 1px solid var(--hairline-strong);
+    color: var(--ink-1); font-size: 12.5px; outline: none;
+  }
+  .clean-input:focus { border-color: var(--accent); }
+
+  .bind-seg {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 3px;
+    border-radius: 8px; background: rgba(0,0,0,0.25); border: 1px solid var(--hairline);
+  }
+  .bind-opt {
+    border: none; background: transparent; color: var(--ink-2); padding: 6px 8px; border-radius: 6px;
+    cursor: pointer; font-size: 11.5px; font-weight: 600; text-align: center; transition: all .12s;
+  }
+  .bind-opt.active { background: var(--bg-elevated); color: var(--ink-1); box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+  .bind-opt:disabled { opacity: 0.35; cursor: not-allowed; }
+  .bind-hint { font-size: 11px; color: var(--ink-3); line-height: 1.45; }
+
+  .quick-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .q-chip {
+    border: 1px solid var(--hairline); background: rgba(255,255,255,0.025); color: var(--ink-2);
+    padding: 3px 8px; border-radius: 6px; font-size: 11px; cursor: pointer; transition: all .12s;
+  }
+  .q-chip:hover { color: var(--ink-1); border-color: var(--hairline-strong); background: var(--bg-hover); }
+
+  .die-domain {
+    border: 1px solid var(--hairline); border-radius: 10px;
+    background: rgba(0,0,0,0.18); padding: 9px 10px;
+    display: flex; flex-direction: column; gap: 7px; user-select: none;
+  }
+  .die-domain-head { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--ink-2); font-weight: 600; }
+  .die-domain-head span.l3 { font-family: var(--mono); font-size: 10px; color: var(--ink-3); font-weight: 500; }
+  .core-matrix { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+
+  .die-core {
+    border: 1px solid var(--hairline); border-radius: 7px;
+    background: rgba(255,255,255,0.02); padding: 5px 6px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .die-core.e-core { background: rgba(255,255,255,0.012); }
+  .die-core.has-on { border-color: rgba(59, 130, 246, 0.35); }
+  .die-core-lbl {
+    display: flex; align-items: center; justify-content: space-between;
+    font-family: var(--mono); font-size: 10px; color: var(--ink-3); cursor: pointer;
+  }
+  .die-core-lbl:hover { color: var(--ink-1); }
+  .thread-row { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+  .thread-row.single { grid-template-columns: 1fr; }
+  .t-bar {
+    height: 18px; border-radius: 4px; border: 1px solid var(--hairline);
+    background: rgba(0,0,0,0.3); color: var(--ink-3);
+    font-family: var(--mono); font-size: 10px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+    cursor: crosshair; transition: all .08s;
+  }
+  .t-bar.on { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 0 10px var(--accent-glow); }
+
+  .hex-footer {
+    margin-top: auto; padding-top: 8px; border-top: 1px solid var(--hairline);
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .hex-input {
+    width: 148px; height: 26px; padding: 0 8px; border-radius: 5px;
+    background: rgba(0,0,0,0.28); border: 1px solid var(--hairline);
+    color: var(--ink-1); font-family: var(--mono); font-size: 11.5px; outline: none;
+  }
+
+  /* ProfileOverlay-style Glass Plan Manager Modal/Flyout */
+  .popover {
+    position: fixed; z-index: 80; min-width: 220px;
+    background: var(--bg-glass); backdrop-filter: blur(22px);
+    border: 1px solid var(--hairline-strong); border-radius: 12px;
+    box-shadow: 0 22px 54px rgba(0, 0, 0, 0.68);
+    padding: 8px; display: flex; flex-direction: column; gap: 3px;
+  }
+  .popover.plan-overlay { width: 340px; padding: 10px; gap: 6px; }
+  .plan-item {
+    padding: 9px 10px; border-radius: 8px; border: 1px solid transparent;
+    background: rgba(255,255,255,0.02); cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    transition: all .12s;
+  }
+  .plan-item:hover { background: var(--bg-hover); border-color: var(--hairline); }
+  .plan-item.active { background: var(--accent-soft); border-color: var(--accent); }
+  .plan-item-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .plan-item-name { font-size: 12.5px; font-weight: 600; color: var(--ink-1); }
+  .plan-item-sub { font-size: 11px; color: var(--ink-3); }
+  .plan-item-ops { display: none; gap: 4px; }
+  .plan-item:hover .plan-item-ops { display: flex; }
+
+  .pop-item {
+    border: none; background: transparent; color: var(--ink-1);
+    padding: 7px 10px; border-radius: 6px; text-align: left; cursor: pointer;
+    font-size: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .pop-item:hover { background: var(--bg-hover); }
+  .pop-item.active { color: var(--accent); font-weight: 600; }
+  .pop-sep { height: 1px; background: var(--hairline); margin: 4px 4px; }
+  .pop-head { padding: 4px 8px; font-size: 11px; color: var(--ink-3); font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+  .pop-confirm-body { padding: 6px 8px 8px; font-size: 12px; color: var(--ink-2); line-height: 1.5; max-width: 260px; }
+  .pop-confirm-actions { display: flex; justify-content: flex-end; gap: 6px; padding: 4px 6px 2px; }
+
+  .hidden { display: none !important; }
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--bg-glass); backdrop-filter: blur(14px);
+    color: var(--ink-1); border: 1px solid var(--hairline-strong);
+    padding: 8px 16px; border-radius: 999px; font-size: 12px; z-index: 95;
+    box-shadow: 0 12px 34px rgba(0,0,0,0.5);
+  }
+</style>
+</head>
+<body data-theme="dark" data-density="standard">
+
+<!-- Minimal Titlebar -->
+<header class="titlebar">
+  <div class="tb-telemetry">
+    <span class="dot good"></span>
+    <span><b id="cpuBanner">Ryzen 9 9955HX</b> · 16C/32T · AC · LocalSystem</span>
+  </div>
+  <div class="tb-right">
+    <div class="tb-tools">
+      <button class="icon-btn" title="场景与自动化" onclick="toast('场景快控 Flyout')">
+        <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      </button>
+      <button class="icon-btn" title="StateLedger 状态账本 (1 项接管)" onclick="toast('StateLedger 状态账本 Flyout')">
+        <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>
+        <span class="mini-dot"></span>
+      </button>
+      <button class="icon-btn" id="appearBtn" title="外观、密度与强调色" onclick="openAppearFlyout(event)">
+        <svg viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/></svg>
+      </button>
+    </div>
+    <button class="cap-btn" title="最小化"><svg viewBox="0 0 12 12"><line x1="1" y1="6" x2="11" y2="6"/></svg></button>
+    <button class="cap-btn" title="最大化"><svg viewBox="0 0 12 12"><rect x="1.5" y="1.5" width="9" height="9"/></svg></button>
+    <button class="cap-btn close" title="关闭"><svg viewBox="0 0 12 12"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg></button>
+  </div>
+</header>
+
+<div class="shell">
+  <!-- Click Logo directly to collapse/expand Nav Rail -->
+  <aside class="nav-rail" id="navRail">
+    <div>
+      <button class="brand-toggle" title="点击展开 / 收起导航" onclick="document.getElementById('navRail').classList.toggle('collapsed')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 21 7 21 17 12 22 3 17 3 7 12 2"/>
+          <polyline points="8 10 15 10 9 15 16 15"/>
+        </svg>
+        <span class="brand-name">Zentwik</span>
+      </button>
+
+      <button class="nav-btn" onclick="toast('首页总览')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg><span class="nav-label">首页总览</span></button>
+      <button class="nav-btn" onclick="toast('CPU 调校')"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg><span class="nav-label">CPU 调校</span></button>
+      <button class="nav-btn" onclick="toast('电源管理')"><svg viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg><span class="nav-label">电源管理</span></button>
+      <button class="nav-btn active"><svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg><span class="nav-label">进程与调度</span></button>
+      <button class="nav-btn" onclick="toast('场景自动化')"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span class="nav-label">场景自动化</span></button>
+      <button class="nav-btn" onclick="toast('方案库')"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span class="nav-label">方案库</span></button>
+    </div>
+    <div>
+      <button class="nav-btn" onclick="toast('能力与诊断')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><span class="nav-label">能力与诊断</span></button>
+      <button class="nav-btn" onclick="toast('系统设置')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span class="nav-label">系统设置</span></button>
+    </div>
+  </aside>
+
+  <!-- Continuous Architectural Plane -->
+  <div class="stage">
+    <!-- Single Unified Command Header -->
+    <header class="cmd-header">
+      <div class="cmd-left">
+        <span class="page-title">进程与调度</span>
+        <!-- Unified PlanHub Trigger (Mirrors Tuning & Power Pages) -->
+        <button class="plan-pill" id="planTrigger" onclick="openPlanOverlay(event)">
+          <span id="planLabel">游戏 CCD0 隔离</span>
+          <span class="dirty-dot hidden" id="planDirtyDot" title="规则有未保存到方案的改动"></span>
+          <span style="color:var(--ink-3)">▾</span>
+        </button>
+              </div>
+
+      <div class="cmd-right">
+        <div class="seg-filter">
+          <button class="seg-btn active" onclick="setFilter('all', this)">全部</button>
+          <button class="seg-btn" onclick="setFilter('managed', this)">已纳管</button>
+          <button class="seg-btn" onclick="setFilter('takeover', this)">接管</button>
+        </div>
+        <div class="cmd-search">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input placeholder="搜索进程或路径…" oninput="setQuery(this.value)" />
+        </div>
+        <button class="btn dock-active" id="dockBtn" onclick="toggleDock()">策略坞</button>
+        <!-- Mirrors ApplyButtonText: "保存并应用" vs "新建并应用" -->
+        <button class="btn btn-primary" id="applyPlanBtn" onclick="applyOrCreatePlan()">保存并应用</button>
+      </div>
+    </header>
+
+    <div class="stage-body">
+      <!-- Borderless Live Process Stream -->
+      <main class="stream-pane">
+        <div class="stream-head">
+          <div class="sortable" onclick="sortBy('name')">进程与路径 <span id="sort-name"></span></div>
+          <div class="sortable num" onclick="sortBy('pid')">PID <span id="sort-pid"></span></div>
+          <div class="sortable num" onclick="sortBy('cpu')">CPU <span id="sort-cpu">↓</span></div>
+          <div>调度目标</div>
+          <div>优先级</div>
+        </div>
+        <div class="stream-scroll" id="streamList"></div>
+      </main>
+
+      <!-- Floating Glass Strategy Dock -->
+      <aside class="strategy-dock" id="strategyDock">
+        <div class="dock-tabs">
+          <div class="dock-seg">
+            <button class="dock-tab active" id="tabRules" onclick="switchDockTab('rules')">已保存规则 · <span id="ruleCount">3</span></button>
+            <button class="dock-tab" id="tabMasks" onclick="switchDockTab('masks')">掩码库 · <span id="maskCount">4</span></button>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="dockActionBtn" onclick="onDockHeaderAction()">+ 新建</button>
+        </div>
+
+        <div class="dock-body" id="dockBody"></div>
+      </aside>
+
+      <!-- Floating Batch Island -->
+      <div class="batch-island hidden" id="batchIsland">
+        <span style="font-size:12px"><strong id="batchLabel">已选 2 项</strong></span>
+        <button class="btn btn-sm" onclick="openBatchTargetMenu(event)">调度目标 ▾</button>
+        <button class="btn btn-sm" onclick="openBatchPrioMenu(event)">优先级 ▾</button>
+        <button class="btn btn-sm btn-primary" onclick="batchSaveAsRules()">存为规则</button>
+        <button class="btn btn-ghost btn-sm" onclick="clearSel()">取消</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="popover hidden" id="popover"></div>
+<div class="toast hidden" id="toastEl"></div>
+
+<script>
+// --- Scheduling Plans (Matches PlanHub.Scheduling snapshot model) ---
+const masks = [
+  { id: "m1", name: "CCD0 游戏独占", type: "cpuSets", mask: 0x0000FFFFn, range: "0–15", note: "L3 3D V-Cache 域" },
+  { id: "m2", name: "仅物理核 · 全域", type: "cpuSets", mask: 0x55555555n, range: "0,2,4…30", note: "关闭超线程争抢" },
+  { id: "m3", name: "CCD1 后台隔离", type: "affinityMask", mask: 0xFFFF0000n, range: "16–31", note: "兼容旧版反作弊" },
+  { id: "m4", name: "轻量 P-Core 4C", type: "cpuSets", mask: 0x000000FFn, range: "0–7", note: "低延迟前台" }
+];
+
+const plans = [
+  {
+    id: "p1", name: "游戏 CCD0 隔离",
+    rules: [
+      { id: "r1", exe: "Cyberpunk2077.exe", maskId: "m1", target: "CCD0 游戏独占", prio: "高", status: "running" },
+      { id: "r2", exe: "obs64.exe", maskId: "m3", target: "CCD1 后台隔离", prio: "高于正常", status: "takeover" },
+      { id: "r3", exe: "Resolve.exe", maskId: "m2", target: "仅物理核 · 全域", prio: "高", status: "idle" }
+    ]
+  },
+  {
+    id: "p2", name: "静音创作",
+    rules: [
+      { id: "r4", exe: "Resolve.exe", maskId: "m2", target: "仅物理核 · 全域", prio: "高", status: "idle" },
+      { id: "r5", exe: "chrome.exe", maskId: "m3", target: "CCD1 后台隔离", prio: "低于正常", status: "running" }
+    ]
+  }
+];
+
+let currentPlanId = "p1";
+let liveRules = JSON.parse(JSON.stringify(plans[0].rules));
+let hasUnsavedPlanChanges = false;
+
+const processes = [
+  { pid: 28410, name: "Cyberpunk2077.exe", path: "E:\\Games\\Cyberpunk 2077\\bin\\x64\\Cyberpunk2077.exe", cpu: 41.8, maskId: "m1", target: "CCD0 游戏独占", prio: "高", status: "running" },
+  { pid: 14920, name: "obs64.exe", path: "C:\\Program Files\\obs-studio\\bin\\64bit\\obs64.exe", cpu: 14.2, maskId: "m3", target: "CCD1 后台隔离", prio: "高于正常", status: "takeover" },
+  { pid: 9312,  name: "chrome.exe", path: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe", cpu: 6.4, maskId: "", target: "默认调度", prio: "正常", status: "none" },
+  { pid: 4108,  name: "Code.exe", path: "C:\\Users\\Motu\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe", cpu: 3.1, maskId: "", target: "默认调度", prio: "正常", status: "none" },
+  { pid: 18824, name: "steamwebhelper.exe", path: "C:\\Program Files (x86)\\Steam\\bin\\cef\\cef.win7x64\\steamwebhelper.exe", cpu: 1.9, maskId: "m3", target: "CCD1 后台隔离", prio: "EcoQoS", status: "running" },
+  { pid: 7204,  name: "Discord.exe", path: "C:\\Users\\Motu\\AppData\\Local\\Discord\\app-1.0.9163\\Discord.exe", cpu: 0.7, maskId: "", target: "默认调度", prio: "正常", status: "none" },
+  { pid: 1120,  name: "dwm.exe", path: "C:\\Windows\\System32\\dwm.exe", cpu: 2.3, maskId: "", target: "默认调度", prio: "高", status: "none" }
+];
+
+const priorities = ["高", "高于正常", "正常", "低于正常", "低", "EcoQoS"];
+
+let filterMode = "all";
+let query = "";
+let sortCol = "cpu";
+let sortDir = -1;
+let selectedPids = new Set();
+let lastClickedPid = null;
+let activeRuleFilterExe = null;
+
+let dockOpen = true;
+let dockTab = "rules";
+let editingMaskId = null;
+let archMode = "amd";
+let multiGroupSim = false;
+let editorDraft = { id: "", name: "", type: "cpuSets", mask: 0x0000FFFFn };
+let brushActive = false;
+let brushPaintOn = true;
+
+const $ = (id) => document.getElementById(id);
+function toast(msg) {
+  const el = $("toastEl");
+  el.textContent = msg;
+  el.classList.remove("hidden");
+  clearTimeout(window._tTimer);
+  window._tTimer = setTimeout(() => el.classList.add("hidden"), 2400);
+}
+function closePop() { $("popover").classList.add("hidden"); }
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("#popover") && !e.target.closest(".cell-btn") && !e.target.closest(".dot-hit") && !e.target.closest("#planTrigger") && !e.target.closest("#appearBtn") && !e.target.closest("#batchIsland")) {
+    closePop();
+  }
+});
+document.addEventListener("pointerup", () => { brushActive = false; });
+
+function getCurrentPlan() { return plans.find(p => p.id === currentPlanId) || null; }
+
+function syncPlanUi() {
+  const plan = getCurrentPlan();
+  $("planLabel").textContent = plan ? plan.name : "未选方案（实时规则）";
+  $("planDirtyDot").classList.toggle("hidden", !hasUnsavedPlanChanges);
+  const applyBtn = $("applyPlanBtn");
+  applyBtn.textContent = plan ? "保存并应用" : "新建并应用";
+  applyBtn.disabled = plan ? !hasUnsavedPlanChanges : false;
+}
+
+function markRuleDirty() {
+  hasUnsavedPlanChanges = true;
+  syncPlanUi();
+}
+
+function applyOrCreatePlan() {
+  const plan = getCurrentPlan();
+  if (plan) {
+    plan.rules = JSON.parse(JSON.stringify(liveRules));
+    hasUnsavedPlanChanges = false;
+    syncPlanUi();
+    toast(`已保存到「${plan.name}」并应用`);
+  } else {
+    const newPlan = { id: "p" + Date.now(), name: `新调度方案 ${plans.length + 1}`, rules: JSON.parse(JSON.stringify(liveRules)) };
+    plans.push(newPlan);
+    currentPlanId = newPlan.id;
+    hasUnsavedPlanChanges = false;
+    syncPlanUi();
+    toast(`已新建「${newPlan.name}」并应用`);
+  }
+  renderDock();
+}
+
+// --- Process Stream (No AM/CS suffix, equalized & restrained) ---
+function renderStream() {
+  let list = processes.filter(p => {
+    if (filterMode === "managed" && p.status === "none") return false;
+    if (filterMode === "takeover" && p.status !== "takeover") return false;
+    if (query) {
+      const q = query.toLowerCase();
+      if (!p.name.toLowerCase().includes(q) && !p.path.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  list.sort((a, b) => sortCol === "name" ? a.name.localeCompare(b.name) * sortDir : (a[sortCol] - b[sortCol]) * sortDir);
+
+  const el = $("streamList");
+  el.innerHTML = "";
+  list.forEach(p => {
+    const row = document.createElement("div");
+    const isSel = selectedPids.has(p.pid);
+    const isManaged = p.status !== "none";
+    const isFilterMatch = activeRuleFilterExe && p.name.toLowerCase() === activeRuleFilterExe.toLowerCase();
+    const isDimmed = activeRuleFilterExe && !isFilterMatch;
+    row.className = `proc-row ${isSel ? "selected" : ""} ${isManaged ? "managed" : ""} ${isFilterMatch ? "rule-highlight" : ""} ${isDimmed ? "dimmed" : ""}`;
+
+    const dotClass = p.status === "takeover" ? "warn" : (p.status === "running" ? "good" : "muted");
+    const dotTitle = p.status === "takeover" ? "用户已在外部接管" : (p.status === "running" ? "已按规则纳管" : "系统默认调度");
+    const targetCls = p.status === "takeover" ? "cell-btn takeover" : (p.maskId ? "cell-btn set" : "cell-btn");
+    const prioCls = p.prio !== "正常" ? "cell-btn set" : "cell-btn";
+
+    row.innerHTML = `
+      <div class="proc-id">
+        <div class="proc-name-line">
+          <span class="proc-name">${p.name}</span>
+          <span class="dot ${dotClass}" title="${dotTitle}"></span>
+        </div>
+        <div class="proc-path" title="${p.path}">${p.path}</div>
+      </div>
+      <div class="pid-cell">${p.pid}</div>
+      <div class="cpu-cell ${p.cpu >= 10 ? "hot" : ""}">${p.cpu.toFixed(1)}%</div>
+      <div>
+        <button class="${targetCls}" onclick="openTargetPop(event, ${p.pid})">${p.target}</button>
+      </div>
+      <div>
+        <button class="${prioCls}" onclick="openPrioPop(event, ${p.pid})">${p.prio}</button>
+      </div>
+    `;
+
+    row.addEventListener("click", (e) => { if (!e.target.closest("button")) handleRowSelect(e, p.pid, list); });
+    row.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      if (!selectedPids.has(p.pid)) { selectedPids.clear(); selectedPids.add(p.pid); renderStream(); updateBatch(); }
+      openContextMenu(e, p);
+    });
+    el.appendChild(row);
+  });
+}
+
+function handleRowSelect(e, pid, visibleList) {
+  if (e.shiftKey && lastClickedPid !== null) {
+    const idx1 = visibleList.findIndex(x => x.pid === lastClickedPid);
+    const idx2 = visibleList.findIndex(x => x.pid === pid);
+    if (idx1 >= 0 && idx2 >= 0) {
+      const [s, end] = idx1 < idx2 ? [idx1, idx2] : [idx2, idx1];
+      if (!e.ctrlKey && !e.metaKey) selectedPids.clear();
+      for (let i = s; i <= end; i++) selectedPids.add(visibleList[i].pid);
+    }
+  } else if (e.ctrlKey || e.metaKey) {
+    if (selectedPids.has(pid)) selectedPids.delete(pid); else selectedPids.add(pid);
+    lastClickedPid = pid;
+  } else {
+    selectedPids.clear(); selectedPids.add(pid); lastClickedPid = pid;
+  }
+  renderStream(); updateBatch();
+}
+
+function clearSel() { selectedPids.clear(); renderStream(); updateBatch(); }
+function updateBatch() {
+  const island = $("batchIsland");
+  if (selectedPids.size >= 2) { island.classList.remove("hidden"); $("batchLabel").textContent = `已选 ${selectedPids.size} 项`; }
+  else island.classList.add("hidden");
+}
+
+function setFilter(mode, btn) {
+  filterMode = mode;
+  document.querySelectorAll(".seg-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  renderStream();
+}
+function setQuery(v) { query = v.trim(); renderStream(); }
+function sortBy(col) {
+  if (sortCol === col) sortDir *= -1; else { sortCol = col; sortDir = col === "name" ? 1 : -1; }
+  ["name","pid","cpu"].forEach(c => $(`sort-${c}`).textContent = "");
+  $(`sort-${col}`).textContent = sortDir === 1 ? "↑" : "↓";
+  renderStream();
+}
+
+// --- Strategy Dock ---
+function toggleDock() {
+  dockOpen = !dockOpen;
+  $("strategyDock").classList.toggle("collapsed", !dockOpen);
+  $("dockBtn").classList.toggle("dock-active", dockOpen);
+}
+function switchDockTab(tab) {
+  dockTab = tab;
+  if (tab === "rules") editingMaskId = null;
+  $("tabRules").classList.toggle("active", tab === "rules");
+  $("tabMasks").classList.toggle("active", tab === "masks");
+  $("strategyDock").classList.toggle("wide", tab === "masks" && editingMaskId !== null);
+  $("dockActionBtn").textContent = tab === "rules" ? "+ 新建" : (editingMaskId ? "← 返回" : "+ 新建掩码");
+  renderDock();
+}
+function onDockHeaderAction() {
+  if (dockTab === "rules") toast("请从左侧进程表右键「存为持久规则」或点击进程行配置");
+  else if (editingMaskId) {
+    editingMaskId = null; $("strategyDock").classList.remove("wide"); $("dockActionBtn").textContent = "+ 新建掩码"; renderDock();
+  } else openMaskEditor(null);
+}
+
+function renderDock() {
+  $("ruleCount").textContent = liveRules.length;
+  $("maskCount").textContent = masks.length;
+  const body = $("dockBody");
+  body.innerHTML = "";
+
+  if (dockTab === "rules") {
+    if (hasUnsavedPlanChanges) {
+      const note = document.createElement("div");
+      note.className = "dock-context-note";
+      note.innerHTML = `<span style="color:var(--warn)">有未保存改动</span>`;
+      body.appendChild(note);
+    }
+
+    liveRules.forEach(r => {
+      const card = document.createElement("div");
+      const isFiltering = activeRuleFilterExe === r.exe;
+      card.className = `rule-card ${isFiltering ? "filtering" : ""}`;
+      const dotCls = r.status === "takeover" ? "warn" : (r.status === "running" ? "good" : "muted");
+      const interactive = r.status === "takeover" ? "interactive" : "";
+      const tip = r.status === "takeover" ? "用户接管中，点击释放" : (r.status === "running" ? "运行并已生效" : "进程未运行");
+
+      card.innerHTML = `
+        <div class="rule-top">
+          <span class="rule-name">${r.exe}</span>
+          <button class="dot-hit ${interactive}" title="${tip}" onclick="onRuleDotClick(event, '${r.id}')">
+            <span class="dot ${dotCls}"></span>
+          </button>
+        </div>
+        <div class="rule-bottom">
+          <span>${r.target} · ${r.prio}</span>
+          <div class="rule-actions">
+            <button class="mini-icon-act del" title="删除规则" onclick="event.stopPropagation(); deleteRule('${r.id}')">×</button>
+          </div>
+        </div>
+      `;
+      card.addEventListener("click", (e) => {
+        if (e.target.closest(".dot-hit") || e.target.closest(".rule-actions")) return;
+        activeRuleFilterExe = isFiltering ? null : r.exe;
+        renderDock(); renderStream();
+      });
+      body.appendChild(card);
+    });
+    return;
+  }
+
+  if (editingMaskId === null) {
+    masks.forEach(m => {
+      const isAm = m.type === "affinityMask";
+      const card = document.createElement("div");
+      card.className = "mask-card";
+      card.innerHTML = `
+        <div class="mask-card-top">
+          <span class="mask-card-name">${m.name}</span>
+          <span class="type-tag">${isAm ? "AM" : "CS"}</span>
+        </div>
+        <div class="mask-range-pill">
+          <span class="lbl">CORE</span>
+          <span>${m.range}</span>
+        </div>
+        <div class="mask-card-foot">
+          <span>${countBits(m.mask)} 个逻辑处理器 · ${m.note}</span>
+          <span style="color:var(--ink-2)">编辑 →</span>
+        </div>
+      `;
+      card.onclick = () => openMaskEditor(m.id);
+      body.appendChild(card);
+    });
+  } else {
+    renderMaskEditor(body);
+  }
+}
+
+// --- Mask Editor (Silicon Brush Canvas) ---
+function getTopo() {
+  if (archMode === "amd") {
+    return [
+      { title: "CCD0 · 3D V-Cache", l3: "64 MB L3", cores: Array.from({length: 8}, (_, i) => ({ c: i, threads: [i*2, i*2+1], kind: "P" })) },
+      { title: "CCD1 · 频率域", l3: "32 MB L3", cores: Array.from({length: 8}, (_, i) => ({ c: i+8, threads: [(i+8)*2, (i+8)*2+1], kind: "P" })) }
+    ];
+  }
+  return [
+    { title: "P-Core 性能核簇", l3: "SMT 2T/核", cores: Array.from({length: 8}, (_, i) => ({ c: i, threads: [i*2, i*2+1], kind: "P" })) },
+    { title: "E-Core 能效核簇", l3: "单线程 1T/核", cores: Array.from({length: 16}, (_, i) => ({ c: i+8, threads: [16+i], kind: "E" })) }
+  ];
+}
+function maskToRangeText(m) {
+  const bits = [];
+  for (let i = 0; i < 32; i++) if ((m >> BigInt(i)) & 1n) bits.push(i);
+  if (!bits.length) return "空";
+  const r = []; let s = bits[0], e = bits[0];
+  for (let i = 1; i < bits.length; i++) {
+    if (bits[i] === e + 1) e = bits[i]; else { r.push(s === e ? `${s}` : `${s}–${e}`); s = e = bits[i]; }
+  }
+  r.push(s === e ? `${s}` : `${s}–${e}`); return r.join(",");
+}
+function countBits(m) { let c = 0; for (let i = 0; i < 64; i++) if ((m >> BigInt(i)) & 1n) c++; return c; }
+
+function openMaskEditor(id) {
+  dockTab = "masks";
+  $("tabRules").classList.remove("active");
+  $("tabMasks").classList.add("active");
+  $("strategyDock").classList.add("wide");
+  $("dockActionBtn").textContent = "← 返回";
+  if (id) { const m = masks.find(x => x.id === id); editingMaskId = id; editorDraft = { id: m.id, name: m.name, type: m.type, mask: m.mask }; }
+  else { editingMaskId = "__new__"; editorDraft = { id: "", name: "新自定义掩码", type: "cpuSets", mask: 0x0000FFFFn }; }
+  renderDock();
+}
+
+function renderMaskEditor(container) {
+  const topo = getTopo();
+  const hexStr = "0x" + editorDraft.mask.toString(16).toUpperCase().padStart(8, "0");
+  const isAmDisabled = multiGroupSim;
+  if (isAmDisabled && editorDraft.type === "affinityMask") editorDraft.type = "cpuSets";
+
+  container.innerHTML = `
+    <div class="editor-head">
+      <span style="font-size:12.5px;font-weight:600">${editingMaskId === "__new__" ? "新建掩码" : "编辑掩码"}</span>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-ghost btn-sm" onclick="switchArch()">${archMode === "amd" ? "切 Intel 异构" : "切 AMD CCD"}</button>
+        <button class="btn btn-sm btn-primary" onclick="saveMaskDraft()">保存掩码</button>
+      </div>
+    </div>
+    <div class="field-label">掩码名称</div>
+    <input class="clean-input" value="${editorDraft.name}" oninput="editorDraft.name = this.value" />
+    <div class="field-label" style="display:flex;justify-content:space-between;align-items:center">
+      <span>下发方式</span>
+      <label style="font-weight:400;cursor:pointer;display:flex;align-items:center;gap:4px">
+        <input type="checkbox" ${multiGroupSim ? "checked" : ""} onchange="multiGroupSim=this.checked;renderDock()" /> 模拟多处理器组
+      </label>
+    </div>
+    <div class="bind-seg">
+      <button class="bind-opt ${editorDraft.type === "cpuSets" ? "active" : ""}" onclick="editorDraft.type='cpuSets';renderDock()">CPU Sets (CS)</button>
+      <button class="bind-opt ${editorDraft.type === "affinityMask" ? "active" : ""}" ${isAmDisabled ? "disabled" : ""} onclick="editorDraft.type='affinityMask';renderDock()">Affinity Mask (AM)</button>
+    </div>
+    <div class="bind-hint">${isAmDisabled ? "多处理器组下 Affinity Mask 仅覆盖组 0，已自动禁用。" : (editorDraft.type === "cpuSets" ? "默认推荐：SetProcessDefaultCpuSets，突破 64 逻辑核限制。" : "传统亲和掩码：SetProcessAffinityMask，仅限组 0，最多 64 核。")}</div>
+    <div class="field-label">快捷勾选 & 拖拽刷选</div>
+    <div class="quick-chips">
+      <button class="q-chip" onclick="quickMask('all')">全选</button>
+      <button class="q-chip" onclick="quickMask('phys')">仅物理核 (T0)</button>
+      <button class="q-chip" onclick="quickMask('d0')">${archMode === "amd" ? "CCD0" : "仅 P-Core"}</button>
+      <button class="q-chip" onclick="quickMask('d1')">${archMode === "amd" ? "CCD1" : "仅 E-Core"}</button>
+      <button class="q-chip" onclick="quickMask('inv')">反选</button>
+      <button class="q-chip" onclick="quickMask('none')">清空</button>
+    </div>
+    <div id="dieCanvas" style="display:flex;flex-direction:column;gap:8px;margin-top:2px"></div>
+    <div class="hex-footer">
+      <span style="font-size:11.5px;color:var(--ink-2)">已选 <strong style="color:var(--ink-1)">${countBits(editorDraft.mask)}</strong> 逻辑核</span>
+      <input class="hex-input" value="${hexStr}" onchange="applyHexInput(this.value)" />
+    </div>
+  `;
+
+  const canvas = $("dieCanvas");
+  topo.forEach(dom => {
+    const domEl = document.createElement("div");
+    domEl.className = "die-domain";
+    domEl.innerHTML = `<div class="die-domain-head"><span>${dom.title}</span><span class="l3">${dom.l3}</span></div>`;
+    const grid = document.createElement("div");
+    grid.className = "core-matrix";
+    dom.cores.forEach(core => {
+      const someOn = core.threads.some(t => (editorDraft.mask >> BigInt(t)) & 1n);
+      const cEl = document.createElement("div");
+      cEl.className = `die-core ${core.kind === "E" ? "e-core" : ""} ${someOn ? "has-on" : ""}`;
+      const lbl = document.createElement("div");
+      lbl.className = "die-core-lbl";
+      lbl.innerHTML = `<span>${core.kind}${core.c}</span><span>${core.threads.length > 1 ? "2T" : "1T"}</span>`;
+      lbl.onclick = () => {
+        const allOn = core.threads.every(t => (editorDraft.mask >> BigInt(t)) & 1n);
+        core.threads.forEach(t => setThreadBit(t, !allOn));
+        renderDock();
+      };
+      cEl.appendChild(lbl);
+      const tRow = document.createElement("div");
+      tRow.className = `thread-row ${core.threads.length === 1 ? "single" : ""}`;
+      core.threads.forEach((t, idx) => {
+        const isOn = Boolean((editorDraft.mask >> BigInt(t)) & 1n);
+        const tBtn = document.createElement("div");
+        tBtn.className = `t-bar ${isOn ? "on" : ""}`;
+        tBtn.textContent = core.threads.length === 1 ? `L${t}` : `T${idx}`;
+        tBtn.addEventListener("pointerdown", (e) => { e.preventDefault(); brushActive = true; brushPaintOn = !isOn; setThreadBit(t, brushPaintOn); renderDock(); });
+        tBtn.addEventListener("pointerenter", () => { if (brushActive) { setThreadBit(t, brushPaintOn); renderDock(); } });
+        tRow.appendChild(tBtn);
+      });
+      cEl.appendChild(tRow);
+      grid.appendChild(cEl);
+    });
+    domEl.appendChild(grid);
+    canvas.appendChild(domEl);
+  });
+}
+
+function setThreadBit(t, on) { if (on) editorDraft.mask |= (1n << BigInt(t)); else editorDraft.mask &= ~(1n << BigInt(t)); }
+function switchArch() { archMode = archMode === "amd" ? "intel" : "amd"; $("cpuBanner").textContent = archMode === "amd" ? "Ryzen 9 9955HX" : "Core Ultra 9 285K (24C/32T)"; renderDock(); }
+function quickMask(kind) {
+  const topo = getTopo();
+  if (kind === "none") editorDraft.mask = 0n;
+  else if (kind === "all") editorDraft.mask = 0xFFFFFFFFn;
+  else if (kind === "inv") editorDraft.mask = (~editorDraft.mask) & 0xFFFFFFFFn;
+  else if (kind === "phys") { let m = 0n; topo.forEach(d => d.cores.forEach(c => { m |= (1n << BigInt(c.threads[0])); })); editorDraft.mask = m; }
+  else { let m = 0n; topo[kind === "d0" ? 0 : 1].cores.forEach(c => c.threads.forEach(t => { m |= (1n << BigInt(t)); })); editorDraft.mask = m; }
+  renderDock();
+}
+function applyHexInput(val) { try { editorDraft.mask = BigInt("0x" + (val.trim().replace(/^0x/i, "") || "0")) & 0xFFFFFFFFn; renderDock(); } catch { toast("十六进制格式无效"); } }
+function saveMaskDraft() {
+  if (editorDraft.mask === 0n) { toast("至少选择一个逻辑核心"); return; }
+  const range = maskToRangeText(editorDraft.mask);
+  if (editingMaskId === "__new__") masks.unshift({ id: "m" + Date.now(), name: editorDraft.name.trim() || "未命名掩码", type: editorDraft.type, mask: editorDraft.mask, range, note: "自定义拓扑" });
+  else { const m = masks.find(x => x.id === editingMaskId); if (m) { m.name = editorDraft.name.trim() || m.name; m.type = editorDraft.type; m.mask = editorDraft.mask; m.range = range; } }
+  editingMaskId = null; $("strategyDock").classList.remove("wide"); $("dockActionBtn").textContent = "+ 新建掩码";
+  toast(`已保存掩码「${editorDraft.name}」`); renderDock();
+}
+
+function deleteRule(id) {
+  const idx = liveRules.findIndex(r => r.id === id);
+  if (idx >= 0) {
+    const removed = liveRules.splice(idx, 1)[0];
+    if (activeRuleFilterExe === removed.exe) activeRuleFilterExe = null;
+    markRuleDirty();
+    renderDock(); renderStream();
+    toast(`已删除规则：${removed.exe}`);
+  }
+}
+
+// --- PlanHub Overlay (ProfileOverlay.xaml Parity) ---
+function showPopover(x, y, html, extraCls = "") {
+  const pop = $("popover");
+  pop.className = `popover ${extraCls}`;
+  pop.innerHTML = html;
+  const rect = pop.getBoundingClientRect();
+  pop.style.left = Math.max(12, Math.min(x, window.innerWidth - rect.width - 14)) + "px";
+  pop.style.top = Math.max(12, Math.min(y, window.innerHeight - rect.height - 14)) + "px";
+}
+
+function openPlanOverlay(e) {
+  e.stopPropagation();
+  const rect = e.currentTarget.getBoundingClientRect();
+  let html = `<div class="pop-head"><span>调度方案</span></div>`;
+  plans.forEach(pl => {
+    const isCur = pl.id === currentPlanId;
+    html += `
+      <div class="plan-item ${isCur ? "active" : ""}" onclick="requestSwitchPlan('${pl.id}')">
+        <div class="plan-item-main">
+          <div class="plan-item-name">${pl.name}${isCur && hasUnsavedPlanChanges ? " *" : ""}</div>
+          <div class="plan-item-sub">${pl.rules.length} 条持久规则${isCur ? " · 当前选中" : ""}</div>
+        </div>
+        <div class="plan-item-ops">
+          <button class="mini-icon-act" title="重命名" onclick="event.stopPropagation(); toast('重命名「${pl.name}」')">✎</button>
+          <button class="mini-icon-act del" title="删除方案" onclick="event.stopPropagation(); deletePlan('${pl.id}')">×</button>
+        </div>
+      </div>
+    `;
+  });
+  html += `<div class="pop-sep"></div>`;
+  html += `<div style="display:flex;gap:6px;justify-content:space-between;padding:2px 2px 0">
+    <button class="btn btn-sm" style="flex:1;justify-content:center" onclick="saveAsNewPlan()">另存为新方案</button>
+    <button class="btn btn-sm btn-primary" style="flex:1;justify-content:center" onclick="closePop(); applyOrCreatePlan()">${hasUnsavedPlanChanges ? "保存至当前方案" : "应用当前方案"}</button>
+  </div>`;
+  showPopover(rect.left, rect.bottom + 8, html, "plan-overlay");
+}
+
+function requestSwitchPlan(targetId) {
+  if (targetId === currentPlanId) { closePop(); return; }
+  const target = plans.find(p => p.id === targetId);
+  if (hasUnsavedPlanChanges) {
+    const pop = $("popover");
+    const rect = pop.getBoundingClientRect();
+    showPopover(rect.left, rect.top, `
+      <div class="pop-head">规则尚未保存</div>
+      <div class="pop-confirm-body">切换到「<strong>${target.name}</strong>」将丢弃当前未保存的规则改动。如需保留，请先保存并应用。</div>
+      <div class="pop-confirm-actions">
+        <button class="btn btn-ghost btn-sm" onclick="closePop()">取消</button>
+        <button class="btn btn-sm btn-primary" onclick="confirmSwitchPlan('${targetId}')">丢弃并切换</button>
+      </div>
+    `);
+    return;
+  }
+  confirmSwitchPlan(targetId);
+}
+
+function confirmSwitchPlan(targetId) {
+  const target = plans.find(p => p.id === targetId);
+  currentPlanId = targetId;
+  liveRules = JSON.parse(JSON.stringify(target.rules));
+  hasUnsavedPlanChanges = false;
+  activeRuleFilterExe = null;
+  closePop();
+  syncPlanUi();
+  renderDock();
+  renderStream();
+  toast(`已切换至调度方案「${target.name}」`);
+}
+
+function saveAsNewPlan() {
+  const newPlan = { id: "p" + Date.now(), name: `自定义调度 ${plans.length + 1}`, rules: JSON.parse(JSON.stringify(liveRules)) };
+  plans.push(newPlan);
+  currentPlanId = newPlan.id;
+  hasUnsavedPlanChanges = false;
+  closePop();
+  syncPlanUi();
+  renderDock();
+  toast(`已另存为「${newPlan.name}」`);
+}
+
+function deletePlan(id) {
+  const idx = plans.findIndex(p => p.id === id);
+  if (idx >= 0) {
+    const removed = plans.splice(idx, 1)[0];
+    if (currentPlanId === id) { currentPlanId = plans[0]?.id || ""; liveRules = plans[0] ? JSON.parse(JSON.stringify(plans[0].rules)) : []; hasUnsavedPlanChanges = false; }
+    closePop(); syncPlanUi(); renderDock(); renderStream();
+    toast(`已删除方案「${removed.name}」`);
+  }
+}
+
+// --- Other Popovers ---
+function onRuleDotClick(e, ruleId) {
+  e.stopPropagation();
+  const r = liveRules.find(x => x.id === ruleId);
+  if (!r || r.status !== "takeover") return;
+  const rect = e.currentTarget.getBoundingClientRect();
+  showPopover(rect.left - 190, rect.bottom + 8, `
+    <div class="pop-head">释放用户接管</div>
+    <div class="pop-confirm-body">用户在外部修改了 <strong>${r.exe}</strong> 的亲和性。是否交还 Zentwik 按「${r.target}」重新调度？</div>
+    <div class="pop-confirm-actions">
+      <button class="btn btn-ghost btn-sm" onclick="closePop()">保持接管</button>
+      <button class="btn btn-sm btn-primary" onclick="releaseTakeover('${r.id}')">确认释放</button>
+    </div>
+  `);
+}
+function releaseTakeover(ruleId) {
+  const r = liveRules.find(x => x.id === ruleId);
+  if (r) { r.status = "running"; processes.filter(p => p.name.toLowerCase() === r.exe.toLowerCase()).forEach(p => p.status = "running"); toast(`已释放接管，${r.exe} 恢复自动调度`); }
+  closePop(); renderDock(); renderStream();
+}
+
+function openTargetPop(e, pid) {
+  e.stopPropagation();
+  const p = processes.find(x => x.pid === pid);
+  const rect = e.currentTarget.getBoundingClientRect();
+  let html = `<div class="pop-head">调度目标 · ${p.name}</div>`;
+  masks.forEach(m => { html += `<button class="pop-item ${p.maskId === m.id ? "active" : ""}" onclick="setProcTarget(${pid}, '${m.id}')"><span>${m.name}</span></button>`; });
+  html += `<button class="pop-item ${!p.maskId ? "active" : ""}" onclick="setProcTarget(${pid}, '')"><span>默认调度</span></button>`;
+  html += `<div class="pop-sep"></div><button class="pop-item" onclick="closePop(); dockOpen=true; $('strategyDock').classList.remove('collapsed'); switchDockTab('masks')"><span>打开掩码库…</span></button>`;
+  showPopover(rect.left, rect.bottom + 6, html);
+}
+function setProcTarget(pid, maskId) {
+  const p = processes.find(x => x.pid === pid);
+  if (maskId) { const m = masks.find(x => x.id === maskId); p.maskId = m.id; p.target = m.name; p.status = "running"; toast(`${p.name} → ${m.name}`); }
+  else { p.maskId = ""; p.target = "默认调度"; p.status = "none"; toast(`已恢复 ${p.name} 为系统默认调度`); }
+  closePop(); renderStream();
+}
+
+function openPrioPop(e, pid) {
+  e.stopPropagation();
+  const p = processes.find(x => x.pid === pid);
+  const rect = e.currentTarget.getBoundingClientRect();
+  let html = `<div class="pop-head">进程优先级</div>`;
+  priorities.forEach(pr => { html += `<button class="pop-item ${p.prio === pr ? "active" : ""}" onclick="setProcPrio(${pid}, '${pr}')">${pr}</button>`; });
+  showPopover(rect.left, rect.bottom + 6, html);
+}
+function setProcPrio(pid, pr) {
+  const p = processes.find(x => x.pid === pid);
+  p.prio = pr; if (pr !== "正常" && p.status === "none") p.status = "running";
+  closePop(); toast(`${p.name} 优先级 → ${pr}`); renderStream();
+}
+
+function openBatchTargetMenu(e) {
+  e.stopPropagation();
+  const rect = e.currentTarget.getBoundingClientRect();
+  let html = `<div class="pop-head">批量设调度目标</div>`;
+  masks.forEach(m => html += `<button class="pop-item" onclick="batchSetTarget('${m.id}')">${m.name}</button>`);
+  html += `<button class="pop-item" onclick="batchSetTarget('')">默认调度</button>`;
+  showPopover(rect.left, rect.top - 160, html);
+}
+function batchSetTarget(maskId) {
+  selectedPids.forEach(pid => {
+    const p = processes.find(x => x.pid === pid); if (!p) return;
+    if (maskId) { const m = masks.find(x => x.id === maskId); p.maskId = m.id; p.target = m.name; p.status = "running"; }
+    else { p.maskId = ""; p.target = "默认调度"; p.status = "none"; }
+  });
+  closePop(); toast(`已批量更新 ${selectedPids.size} 个进程`); renderStream();
+}
+function openBatchPrioMenu(e) {
+  e.stopPropagation();
+  const rect = e.currentTarget.getBoundingClientRect();
+  let html = `<div class="pop-head">批量改优先级</div>`;
+  priorities.forEach(pr => html += `<button class="pop-item" onclick="batchSetPrio('${pr}')">${pr}</button>`);
+  showPopover(rect.left, rect.top - 200, html);
+}
+function batchSetPrio(pr) {
+  selectedPids.forEach(pid => { const p = processes.find(x => x.pid === pid); if (p) p.prio = pr; });
+  closePop(); toast(`已将 ${selectedPids.size} 项优先级设为 ${pr}`); renderStream();
+}
+function batchSaveAsRules() {
+  let added = 0;
+  selectedPids.forEach(pid => {
+    const p = processes.find(x => x.pid === pid);
+    if (p && !liveRules.some(r => r.exe.toLowerCase() === p.name.toLowerCase())) {
+      liveRules.unshift({ id: "r" + Date.now() + pid, exe: p.name, maskId: p.maskId || "m1", target: p.maskId ? p.target : "CCD0 游戏独占", prio: p.prio, status: "running" });
+      added++;
+    }
+  });
+  if (added > 0) { markRuleDirty(); renderDock(); toast(`已将 ${added} 项存为持久规则（方案待保存）`); }
+  else toast("所选进程均已存在持久规则");
+}
+
+function saveProcAsRule(pid) {
+  const p = processes.find(x => x.pid === pid);
+  closePop();
+  if (!p) return;
+  if (!liveRules.some(r => r.exe.toLowerCase() === p.name.toLowerCase())) {
+    liveRules.unshift({ id: "r" + Date.now(), exe: p.name, maskId: p.maskId || "m1", target: p.maskId ? p.target : "CCD0 游戏独占", prio: p.prio, status: "running" });
+    markRuleDirty();
+    renderDock();
+    toast(`已将 ${p.name} 存为持久规则（方案已标为未保存）`);
+  } else {
+    toast(`${p.name} 已在当前规则列表中`);
+  }
+}
+
+function openContextMenu(e, p) {
+  const dir = p.path.substring(0, p.path.lastIndexOf("\\"));
+  showPopover(e.clientX, e.clientY, `
+    <div class="pop-head">${p.name} · PID ${p.pid}</div>
+    <button class="pop-item" onclick="closePop(); toast('已打开 ${dir}')">打开进程所在目录</button>
+    <button class="pop-item" onclick="closePop(); toast('已复制完整路径')">复制进程路径</button>
+    <div class="pop-sep"></div>
+    <button class="pop-item" onclick="saveProcAsRule(${p.pid})">存为持久规则</button>
+    ${p.status === "takeover" ? `<button class="pop-item" onclick="pRelease(${p.pid})">释放用户接管</button>` : ""}
+    <button class="pop-item" onclick="setProcTarget(${p.pid}, '')">解绑并恢复默认</button>
+  `);
+}
+function pRelease(pid) { const p = processes.find(x => x.pid === pid); if (p) p.status = "running"; closePop(); renderStream(); toast(`已释放 ${p.name} 接管`); }
+
+function openAppearFlyout(e) {
+  e.stopPropagation();
+  const rect = e.currentTarget.getBoundingClientRect();
+  showPopover(rect.left - 160, rect.bottom + 6, `
+    <div class="pop-head">外观与密度</div>
+    <button class="pop-item" onclick="document.body.setAttribute('data-theme', document.body.getAttribute('data-theme')==='dark'?'light':'dark'); closePop()">切换深色 / 浅色主题</button>
+    <div class="pop-sep"></div>
+    <button class="pop-item" onclick="document.body.setAttribute('data-density','relaxed'); closePop()">密度：宽松</button>
+    <button class="pop-item" onclick="document.body.setAttribute('data-density','standard'); closePop()">密度：标准</button>
+    <button class="pop-item" onclick="document.body.setAttribute('data-density','compact'); closePop()">密度：紧凑</button>
+  `);
+}
+
+syncPlanUi();
+renderStream();
+renderDock();
+</script>
+</body>
+</html>
