@@ -62,18 +62,27 @@ Toolhelp 快照会列出已退出但对象尚未回收的进程（`ThreadCount =
 
 口径变化：同样时刻，`Process.GetProcesses()` 报 276，Toolhelp 过滤后 309，`Get-Process` 306。原实现少报约 33 个（受保护/跨会话进程），新口径更接近任务管理器。
 
-## 7. 禁则（由测试强制）
+## 7. 曾有的 API 黑名单（2026-11-28 移除）
 
-`tests/Zentwik.Core.Tests/PerformanceGuardTests.cs` 扫描 `src/` 全部源码（跳过注释与构建输出），出现下列 API 即测试失败：
+`tests/Zentwik.Core.Tests/PerformanceGuardTests.cs` 已于 2026-11-28 删除。它曾扫描 `src/` 全部源码（跳过注释与构建输出），命中下列字符串即测试失败：`System.Management` / `ManagementObjectSearcher` / `ManagementObject` / `PerformanceCounter` / `GetProcessesByName` / `Process.GetProcesses` / `ServiceController`。
 
-- `System.Management` / `ManagementObjectSearcher` / `ManagementObject`
-- `PerformanceCounter`
-- `GetProcessesByName` / `Process.GetProcesses`
-- `ServiceController`
+**移除理由（用户判定）**：字符串黑名单挡住的只是旧版**已经修过**的那几个坑，挡不住设计层面的浪费。同期的三处真实缺陷没有一处落在名单覆盖范围内，反例都是本工程自己造的：
 
-理由：这些 API 的代价不在单次调用，而在全局影响。WMI 会拉起 Winmgmt 并让调用方同步等待（旧版曾因调度用 WMI 查进程把系统拖到半崩）；`PerformanceCounter` 首次访问要加载计数器库；`GetProcessesByName` 每次枚举全表。约定一旦破，问题只在用户机器上以"卡顿"出现，等反馈已经太晚。
+| 缺陷 | 用到什么 | 黑名单管得着吗 |
+|---|---|---|
+| 逐核频率在每次传感器采样时绑核读 16 个物理核，订阅期上下文切换 23.5k → 71.7k/s | `SetThreadAffinityMask` + MSR 读 | 管不着 |
+| `modules disable` 只改状态，不停订阅、不释放 PawnIO/SMN 会话、不回退账本 | 无（逻辑没写） | 管不着 |
+| 模块开关除 `power-limits` 外无入口强制，是标签不是开关 | 无（设计缺陷） | 管不着 |
 
-另有一条不写成测试但同样成立的约束：**不要调用 `timeBeginPeriod`** 提高定时器精度。它会拉高全系统功耗与唤醒频率，收益仅是让 2 秒轮询更准时。
+因此它从"性能护栏"降级为一个**回归绊线**（防止把旧版修过的东西手滑写回来），不构成质量保证。把它当成"架构有边界、老版靠人记"的证据是偷换——2026-11-28 用户当场指出。
+
+**来源待考**：该测试此前被本文写成一条设计决定，但仓库与研究记录中均无用户要求的痕迹。用户 2026-11-28 明确表示"强行禁止没有意义"。不要再把它当作共识引用。
+
+**仍然成立的是背后的事实**，它们是选型依据而非禁则：WMI 会拉起 Winmgmt 并让调用方同步等待（旧版曾因调度用 WMI 查进程把系统拖到半崩）；`PerformanceCounter` 首次访问要加载计数器库；`GetProcessesByName` 每次枚举全表。选实现时照此判断，不靠名单兜底。
+
+另有一条不写成测试的约定：**不要调用 `timeBeginPeriod`** 提高定时器精度。它会拉高全系统功耗与唤醒频率，收益仅是让 2 秒轮询更准时。
+
+**替代方向（未实现）**：用端到端开销门槛代替黑名单——订阅 60 秒内自身 CPU 增量、系统上下文切换涨幅超过阈值即失败。这类测试能捕捉"每拍多做了一件事"，字符串匹配永远不能。未实现前不得对外声称开销受测试保护。
 
 ## 8. 核验状态
 
