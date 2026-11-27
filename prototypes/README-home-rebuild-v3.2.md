@@ -1,4 +1,4 @@
-# Zentwik Home Rebuild v3 · Modular Glass Workspace · v3.2
+# Zentwik Home Rebuild v3.2 · Modular Glass Workspace
 
 ## 本轮调整
 
@@ -40,8 +40,9 @@
 
 ## 文件
 
-- `zentwik-home-rebuild-v3.html`：完整可交互原型。
-- `zentwik-home-rebuild-v3-preview.png`：桌面端预览截图。
+- `zentwik-home-rebuild-v3.2.html`：完整可交互原型。
+- `zentwik-home-rebuild-v3.2-preview.png`：桌面端预览截图。
+- `zentwik-home-rebuild-v3.2-layout-edit.png`：布局编辑与二维拖动手柄预览。
 
 ## 本次交互修订（v3.2）
 
