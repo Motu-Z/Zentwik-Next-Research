@@ -19,7 +19,7 @@
 | 漂移核对（`DetectDriftAsync`） | 30 秒（自 2026-11-26） | 有 `cpu.co.*` 账本时逐核读固件；逐项回读电源设置 | 无 |
 | 核心停泊读取（`CoreParkingPercent`） | 10 秒缓存 | 读一次电源设置项 | 无 |
 | 进程名快照（`AffinityScheduler.Find`） | 1 秒 TTL | Toolhelp 快照，只取 PID 与映像名，不 OpenProcess | 无 |
-| 遥测推流（`TelemetryHub`） | 客户端订阅，500–5000 ms | 采样 CPU/内存 + 进程计数；进程计数另有 2 秒 TTL | 无订阅者时完全不跑 |
+| 遥测推流（`TelemetryHub`） | 客户端订阅，500–5000 ms | 采样 CPU/内存 + 进程计数 + 逐逻辑处理器占用率；进程计数另有 2 秒 TTL；占用率每拍读 | 无订阅者时完全不跑 |
 | 日志落盘 | 每 32 行 info；warn/error 立即 | `StreamWriter.WriteLine` + 条件 Flush | 无 |
 
 配置变更走信号唤醒（`NotifyConfigChanged`），不靠缩短间隔换响应速度。遥测只在客户端订阅期间运行，`zentwik monitor` 或桌面端关闭后归零。
@@ -110,6 +110,8 @@ Toolhelp 快照会列出已退出但对象尚未回收的进程（`ThreadCount =
 | 进程计数的 2 秒 TTL | 2 秒 | 内部节流，不是采样语义；暴露出去只会让"进程数为什么没变"变成问题 |
 
 - 这些值都在源码常量里，改它们是改行为，须走评估而不是配置。
+
+逐逻辑处理器占用率**每拍随推送读，不单独开放间隔**：它一次 `NtQuerySystemInformation(SystemProcessorPerformanceInformation)` 拿整张表（32 逻辑处理器一条调用），单次成本微秒级、无分配压力，属于"读系统计数器"那一类，与温度/功耗的"读硬件要拿互斥"不同。与其把它做成第三个可配间隔，不如就让它跟着推送走——它本身就是对"这拍的 CPU 总占用摊到了哪些核"的即时解释。真机（9955HX，32 逻辑处理器）实测输出分布正常，能看出忙核集中在少数几个，单帧 `cpu 0.0%` 时逐核也都接近 0。
 
 ### 9.3 落到实现的位置
 
