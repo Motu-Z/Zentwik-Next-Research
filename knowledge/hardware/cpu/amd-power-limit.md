@@ -62,6 +62,8 @@ RyzenAdj 的 `refresh_table` 同向：前六项为 0 时再发一次传输并重
 | `[2]` / `[3]` | `0x08` / `0x0C` | FAST limit / 当前值 |
 | `[4]` / `[5]` | `0x10` / `0x14` | SLOW limit / 当前值 |
 
+**判定「表里有没有值」的下界必须是 1 W，不能是 0**（2026-11-28 实测踩到）。未传输时的残留位模式解出来是 `1e-23` 这类**极小的正数**，用 `raw > 0` 判断会通过校验、再被 `Math.Round` 舍成 `0`，于是「全 0 就强制传输」的分支永远进不去，冷启动后一直读残留、一直显示 0 W，而且 `HasAny` 为真会把 0 当有效值上报。正确判据：`raw is >= 1 and <= 1000`，未填充返回 `null` 而不是 `0`。
+
 TDC/EDC 的当前值不在稳定段内（偏移随表版本变化），本通道不读。
 
 ## 4. 写入与回读语义
@@ -92,6 +94,14 @@ TDC/EDC 的当前值不在稳定段内（偏移随表版本变化），本通道
 | 写入折算 | 回读 = 请求 × 0.8，四组一致：95→76、65→52、125→100、85→68 | 实测 |
 | 基线复原 | 写回 125/85 精确回到 100/68 | 实测 |
 | TDC/EDC 写入 | 未验证（无回读通道，不做无依据的硬件改动） | 未验证 |
+| `0x03` 传输偶发被拒 | 驱动返回 Win32 `1359`（`ERROR_ALREADY_EXISTS`，「已有在途」），重发即成功；一次失败就让整帧读数作废，表现为「打开就报错、刷新才对」 | 实测 2026-11-28 |
+
+**`0x03` 要允许重试**（2026-11-28）。传输是幂等的（把固件里的表重抄一遍到 DRAM），重试无副作用；实测最多 3 次、退避 100/200 ms 足以恢复。同轮还确认两条前置条件各自对应的错误码，可用于分诊：
+
+| 现象 | Win32 | 说明 |
+|---|---|---|
+| 发 `0x03` 时不持 `Global\Access_PCI` | `1359` | 与其他 SMU 使用者撞车，拿锁后再发即可 |
+| 未先 `ioctl_resolve_pm_table` 就 `ioctl_read_pm_table` | `21`（`ERROR_NOT_READY`） | 地址未解析，先 resolve |
 
 **0.8 折算的原因 = Inferred，不是事实。** 最可能的解释是 RSMU 参数表示封装总功耗，而 PM 表的 limit 表示 CPU 部分份额，移动 SoC 有 iGPU/SoC 分项；但没有固件文档或寄存器证据闭合。不同机型/BIOS 的系数可能不同，不得把 0.8 写成通用换算。
 
@@ -107,7 +117,7 @@ TDC/EDC 的当前值不在稳定段内（偏移随表版本变化），本通道
 
 ## 7. 核验状态分项
 
-RSMU `0x56/0xCB/0x57/0x58` 与 MP1 `0x4F/0x3E/0x5F/0x3C/0x3D` = Verified 上游源码逐行；`ioctl_send_smu_command` 仅 RSMU = Verified 上游源码；PM 表两个 IOCTL 与 `0x03` 传输 = Verified 实测 + RyzenAdj 源码同向；前六项偏移 = Verified（RyzenAdj 与旧版一致）；本机读写与 0.8 折算 = Verified 实测（已复原）；折算原因 = Inferred；旧版 `0xFD` 归因 = Inferred；TDC/EDC 写入与是否存在读命令 = Unverified。
+RSMU `0x56/0xCB/0x57/0x58` 与 MP1 `0x4F/0x3E/0x5F/0x3C/0x3D` = Verified 上游源码逐行；`ioctl_send_smu_command` 仅 RSMU = Verified 上游源码；PM 表两个 IOCTL 与 `0x03` 传输 = Verified 实测 + RyzenAdj 源码同向；前六项偏移 = Verified（RyzenAdj 与旧版一致）；本机读写与 0.8 折算 = Verified 实测（已复原）；折算原因 = Inferred；旧版 `0xFD` 归因 = Inferred；TDC/EDC 写入与是否存在读命令 = Unverified；「下界必须是 1 W」与「`0x03` 需重试（1359）」= Verified 实测（2026-11-28）。
 
 ## 8. PM 表能否当遥测用（2026-11-27 探查结论）
 
