@@ -21,10 +21,9 @@
 | 新项目（对照） | `Motu-Z/Zentwik` 的 `feat/gui-protocol` | 以 clone 到的 HEAD 为准，报告中写 SHA |
 | 研究文档（第三极） | `Motu-Z/Zentwik-Next-Research` 的 `main` | `d3ed2cb`（2026-11-28 已推送） |
 
-**已知基线缺口，不得漏报**：本机 Windows 工作区的 `feat/gui-protocol` 有 3 个提交尚未推送到 GitHub：
+**基线说明**：`feat/gui-protocol` 已于 2026-11-28 15:37 推送至 `100e9c0`，与 GitHub 同步。
 `9af3d03`（页签按老 UI 重排成七页、顶栏删掉）、`03f9997`（PM 表读数恒 0 的判据修复）、
-`100e9c0`（功耗重复应用不再误报）。你从 GitHub 读到的代码缺这 3 项；凡涉及这些区域的项，
-标 `[远端基线缺失，需本机补查]`，不要推断为「新项目没有」。
+`100e9c0`（功耗重复应用不再误报）三项均已在远端，对照时按此基线，不要误判为缺失。
 
 **访问边界**：旧项目 Windows 本地 `D:\Projects\Zentwik Project` 你无法访问，只用 GitHub `main`；
 本机 AI 会在汇总阶段补查本地正本。不要扫描磁盘、不要猜本地路径。
