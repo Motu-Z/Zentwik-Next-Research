@@ -24,7 +24,7 @@
 | ADR 文档数 | **8 篇**（`ADR-001`..`008`） | `decisions/ADR-*.md` | 已闭合 (`I.md`) |
 | `MIGRATION_MATRIX.md` 主表 | **15 行**（`#1`..`#15`） | `project/MIGRATION_MATRIX.md:21-35` | 已闭合 (`I.md`) |
 | 知识与研究扫描文档 | **39 篇**（26 规范 + 13 研究/交接） | `knowledge/` + `research/` | 已闭合 (`J.md`) |
-| 10 分片审计条目总计 | **241 条** | A(14)+B(32)+C(16)+D(24)+E(20)+F(23)+G(15)+H(15)+I(44)+J(38) | 已闭合 |
+| 10 分片审计条目总计 | **241 条** | A(14)+B(32)+C(16)+D(24)+E(20)+F(23)+G(15)+H(15)+I(44)+J(38) | 已闭合（本轮仅修正条目内容，未新增条目） |
 
 ---
 
@@ -40,7 +40,7 @@
 | 电源备份与隐藏方案 | `power-management.md`：注册表子键过滤 + 双轨备份恢复 | 仅 `PowerEnumerate` 可见枚举，无删前备份与恢复 | 缺 |
 | 硬件遥测与历史 | `polling-budget.md` / `amd-power-limit.md`：订阅驱动、3600 帧环形缓冲、SMN/RAPL/APERF | 无系统遥测、无温度/功耗/逐核频、仅调度页 3s 进程采样 | 缺 |
 | AMD 功耗墙 | `amd-power-limit.md`：RSMU `0x56/0xCB/0x57/0x58` + PM 表回读 | 旧版 `348712a` 已删除，基线 `7274626` 无功耗墙代码 | 缺 |
-| CLI 与 i18n | `ADR-007` / `ARCHITECTURE_CONSTRAINTS.md:9`：正式 CLI、三语资源表 | 无独立 CLI；全量简体中文硬编码 | 缺 |
+| CLI 与 i18n | `ADR-007` / `ARCHITECTURE_CONSTRAINTS.md:9`：正式 CLI、三语资源表（最新口径：界面先不处理 i18n 切换 ≠ 只做简体中文；文案不许硬编码，必须走 `Zentwik.Localization`） | 无独立 CLI；全量简体中文硬编码 | 缺 |
 | 开机防砖护栏 | （旧项目自建） | `BootGuard.cs` 连续 3 次写入未完成阻断 | 旧有文档未纳 |
 
 ### 2.2 文档要求 vs 新现实（`100e9c0`）
@@ -51,9 +51,9 @@
 | 特权服务 NativeAOT | `ADR-001:13`：`Zentwik.Agent` 使用 NativeAOT | `Zentwik.Agent.csproj:7` 为 `<PublishAot>false</PublishAot>` | 文档与现实冲突 |
 | 持久化分文件 | `ADR-006:12`、`serialization-persistence.md:13`：设置/方案/场景/账本分文件 | `StateStore.cs:21`、`StateDocument.cs` 全部合存在单文件 `state.json` | 文档与现实冲突 |
 | 服务非崩溃恢复前提 | `security-service.md:20-21,57`：`1066` 退出码须置 `SERVICE_CONFIG_FAILURE_ACTIONS_FLAG=TRUE` | `WindowsServiceHost` 上报 `1066`，但 `ServiceInstaller.cs:526-551` 未设该 Flag | 文档与现实冲突 |
-| FMax Override 语义 | `amd-smu.md §4`：`-1000..+200 MHz` 偏移量 | `AmdSmuTuningProvider.cs:203` 按 `[1000, 7000] MHz` 绝对频率直传 `0x70` | 文档与现实冲突 |
+| FMax Override 偏移参数 | `amd-smu.md:76-90` 明确区分 FMax 绝对频率与 Boost Clock Override 偏移（`-1000..+200 MHz` 有符号偏移） | `AmdSmuTuningProvider.cs:203` 写绝对 Boost 上限（`[1000, 7000] MHz` 仅为工具支持范围）；**FMax Override 偏移参数未实现**（原判：误判为「文档与现实冲突」；另注：产品 commit `2d9351d` 已将绝对频率改为钳制写入，账本记钳制后期望值与回读真实值） | 缺（偏移未实现） |
 | 单实例与托盘 | `MIGRATION_MATRIX.md:35` 称客户端无状态无需单实例 | `Desktop` 已启用 `NotifyIcon` 托盘，但 `Desktop/Program.cs` 无互斥体，多开冲突 | 文档与现实冲突 |
-| 本地化与硬编码 | 最新口径：文案不许硬编码，走 `Zentwik.Localization` | `MainForm.cs` 已走 `_catalog`，但 `MainViewModel.cs` 仍有 29 处硬编码中文 | 文档与现实冲突 |
+| 本地化与硬编码 | 最新口径：界面先不处理 i18n 切换 ≠ 只做简体中文；文案不许硬编码，必须走 `Zentwik.Localization` | `SupportedLanguages` 锁死 `["zh-CN"]`（缺口）；`MainForm.cs` 走 `_catalog`，但基线 `100e9c0` 时 `MainViewModel.cs` 实际约 **35 行**含硬编码中文（原判：误记 29 处并归类为「文档与现实冲突」；现归类为**违反用户最新口径**；注：该缺口已在产品 commit `2d9351d` 修复，新增 39 键 × 三语，因本报告基线为 `100e9c0` 故保留历史记录） | 缺（违反用户最新口径） |
 | 安装脚本路径与合规 | `installer.md:3` 写 `zentwik-next.iss`；`ADR-008:43` 称分发合规未落地 | 实为 `scripts/installer/zentwik.iss`；`licenses/LGPL-2.1.txt` 与 `THIRD-PARTY-NOTICES.md` 已补齐 | 文档滞后 |
 | 第三方插件隔离 | `PROJECT_BRIEF.md:23`、`modules-capabilities.md` | 无插件进程隔离与加载器 | 缺 |
 
@@ -63,11 +63,11 @@
 |---|---|---|---|
 | **进程权限与服务** | 每用户提权 Worker | `LocalSystem` 服务 + 调用方 SID/IL/Session 校验 | 新补齐安全边界（缺非崩溃恢复 Flag 与管道 `FirstPipeInstance`） |
 | **AMD CO / FMax** | 对称 `±50`、线性核映射、基线 0 仍写 | 不对称 `[-50,+30]`、APOB/CPUID+L3、`Global\Access_PCI`、基线 0 拒写 | 后端增强，但 **Desktop UI 无法创建 FMax 方案** |
-| **AMD 功耗墙** | 无（已删） | RSMU 读写 + `0x03` 3 次重试 + `1 W` 下界 + 四态回读 + `±1 W` 探针 | 新有旧无（9955HX 管理员会话实测），但 **有回读无回退**（未进 `StateLedger`） |
+| **AMD 功耗墙** | 无（已删） | RSMU 读写 + `0x03` 3 次重试 + `1 W` 下界 + 四态回读 + `±1 W` 探针 | 新有旧无（静态源码审计 + 引用既有 9955HX 管理员会话实测记录，非本轮验证），但 **有回读无回退**（未进 `StateLedger`） |
 | **Intel 调校** | Core/GT/Cache 三平面电压 + `0x1AD` 8 档睿频读写 | 仅 Core 平面电压（含 busy 轮询与跨进程锁）+ `0x1AD` 1C/8C 只读 | **部分/退化**，且仅 `FakeIntelTuningProvider` 验证，Desktop UI 无写入入口 |
 | **电源方案管理** | 仅可见枚举 + 8 项策略 AC/DC UI 编辑 + 活动切换 | 注册表全枚举 + 双轨备份还原；通用 `PowerPlan` 有回读 | 备份还原新有旧无；**缺主动切换方案 op 与 8 项策略预设 UI** |
 | **进程与调度** | Toolhelp 实时列表 + CPU% 采样 + `EcoQoS` + 掩码编辑器 + 退避重试 | 后端 `SchedulingPlan` 强制执行/漂移重写；**无 `process.*` op** | **UI 进程页为空骨架**、缺 `EcoQoS`、缺失败退避、缺 `ProcessRefresher` |
-| **监控与遥测** | 仅调度页 3s 进程采样 | `Win32TelemetrySource` + `AmdSensorSource` + 3600 帧缓冲 + CLI | 新有旧无（9955HX 实测），但 **Desktop UI 未画折线、未显示温功与逐核频** |
+| **监控与遥测** | 仅调度页 3s 进程采样 | `Win32TelemetrySource` + `AmdSensorSource` + 3600 帧缓冲 + CLI | 新有旧无（静态源码审计 + 引用既有 9955HX 实测记录，非本轮验证），但 **Desktop UI 未画折线、未显示温功与逐核频** |
 | **场景与账本** | 退出不回退、无前值账本 | `StateLedger` + 用户接管 + 退出/同周期恢复 + 唤醒核对 | 后端完备，**Desktop UI 漏 `ProcessExited` 触发器**，唤醒/重启仅 Fake 单测 |
 | **CLI / 设置 / 托盘** | 无 CLI；丰富设置页；Worker 托盘含方案菜单；双互斥体 | 16 命令 CLI（7 退出码）；WinForms 7 页；简单托盘；无单实例 | CLI 新有旧无；Desktop 缺单实例与采样间隔配置 |
 
@@ -101,7 +101,7 @@
 | `F-03`/`A-10` | `processExited` 场景触发器 | 后端 `SceneEngine` 与 `Scene.cs` 已实现，但 `MainViewModel.TriggerKinds:162-167` **漏掉 `ProcessExited`** | 部分实现（断在 Desktop UI 下拉） |
 | `E-20`/`A-04` | 监控折线图与实时温度/功耗/逐核频展示 | `MainViewModel.ApplySample:1487` 已发 `HistoryChanged`，但 `MainForm.cs` **未订阅重绘**，实时卡未接温度/功耗/逐核频 | 部分实现（断在 WinForms 视图消费） |
 | `C-08`/`A-09` | 8 项处理器电源策略参数预设与 UI 编辑 | 仅 `PlanCoordinator.ApplyPower` 接通用 `PowerPlan`，**无 8 项固定 GUID 预设与范围校验，UI 无编辑入口** | 部分实现 |
-| `H-08`/`H-15` | 设置页与采样间隔/多语言同步 | `UserSettings` 有 `MonitorIntervalMs`/`SensorIntervalMs`，但 `PersistSettingsAsync:1525` 未传，设置页无控件；`SupportedLanguages` 仅 `zh-CN` | 部分实现 |
+| `H-06`/`H-08`/`H-09`/`H-15` | 设置页与采样间隔/多语言/硬编码同步 | 设置页必须保留且有内容（当前已承接语言/自启/托盘/模块启停，但 `MonitorIntervalMs`/`SensorIntervalMs` 未接线）；`SupportedLanguages` 锁死 `["zh-CN"]` 属**缺口**（界面不处理切换 ≠ 只做简体中文）；基线 `100e9c0` 下 `MainViewModel.cs` 约 35 行硬编码中文属**违反用户最新口径**（已在 `2d9351d` 修复，保留历史记录） | 缺口 / 部分实现 |
 | `D-02` | CPU Sets 与 Affinity Mask 互斥清理 | 写 CPU Sets 前检外部窄亲和性，但规则切换或共存时**不自动清理另一侧旧限制** | 部分实现 |
 | `G-10`/`J-23` | 命名管道安全加固 | `AgentServer` 未设 `FirstPipeInstance` 与 `PIPE_REJECT_REMOTE_CLIENTS`；`AgentConnection` 未显式设 `TokenImpersonationLevel.Identification` | 部分实现 |
 
@@ -120,10 +120,10 @@
 
 ### 3.5 新有旧无（相对旧版 `7274626` 的净新增能力）
 
-1. **硬件功耗墙（可选模块 `power-limits`）**：RSMU DPTC 读写、PM 表 `0x03` 3 次重试与 `1 W` 下界、写后四态分类与探针复原（9955HX 管理员会话实测）。
-2. **系统与硬件遥测**：`Win32TelemetrySource`、`ProcessorLoadReader`（每逻辑核）、`AmdSensorSource`（SMN 温度 / RAPL 功耗 / APERF 逐核均频，9955HX 实测）、`TelemetryRingBuffer`（3600 帧）与订阅背压控制。
+1. **硬件功耗墙（可选模块 `power-limits`）**：RSMU DPTC 读写、PM 表 `0x03` 3 次重试与 `1 W` 下界、写后四态分类与探针复原（验证级别：静态源码审计 + 引用既有 9955HX 管理员会话实测记录，非本轮验证）。
+2. **系统与硬件遥测**：`Win32TelemetrySource`、`ProcessorLoadReader`（每逻辑核）、`AmdSensorSource`（SMN 温度 / RAPL 功耗 / APERF 逐核均频；验证级别：静态源码审计 + 引用既有 9955HX 实测记录，非本轮验证）、`TelemetryRingBuffer`（3600 帧）与订阅背压控制。
 3. **场景生命周期与状态账本**：`StateLedger` 全字段追踪、确定性三层仲裁、用户接管与释放（`ledger.list/release`）、`processExited` 闩锁与退出回退。
-4. **电源方案备份与隐藏方案识别**：注册表子键过滤 overlay 占位键、JSON + `.pow` 双轨备份与从「平衡」派生还原（9955HX 实测）。
+4. **电源方案备份与隐藏方案识别**：注册表子键过滤 overlay 占位键、JSON + `.pow` 双轨备份与从「平衡」派生还原（验证级别：静态源码审计 + 引用既有 9955HX 实测记录，非本轮验证）。
 5. **独立 CLI（16 命令 / 7 退出码 / `--json`）与 Windows 服务化**：`Zentwik.Cli`、`Zentwik.Agent` (`LocalSystem` + `PipeCaller` 校验 + `DoctorService` + `DataDirectoryMigration`)。
 
 ### 3.6 文档与现实冲突（汇总）
@@ -131,10 +131,10 @@
 1. **UI 技术栈**：`ADR-002` (WPF)、`AI_UI_DESIGN_GUIDANCE` (Flutter, Deprecated)、`UI_UX_DESIGN_SPEC` (WPF, Deprecated) 与现实 `WinForms` (`MainForm.cs`) 冲突。
 2. **NativeAOT**：`ADR-001` 要求 `Zentwik.Agent` 用 NativeAOT，源码 `<PublishAot>false</PublishAot>`。
 3. **分文件持久化**：`ADR-006` / `serialization-persistence.md` 要求分文件，源码全合并在单一 `state.json`。
-4. **FMax Override 语义**：`amd-smu.md §4` 写 `-1000..+200 MHz` 偏移，新旧代码均按绝对 MHz 直传 `0x70`。
+4. **FMax Override 偏移未实现（非语义冲突）**：原判误将 `amd-smu.md:76-90` 的 `-1000..+200 MHz` 偏移判为「文档与现实冲突」；实际该文档已明确区分 FMax 绝对频率与 FMax Override 偏移，代码写绝对 Boost 上限（`1000–7000 MHz` 仅为工具支持范围），属**FMax Override 偏移参数未实现**（补充：产品 commit `2d9351d` 已将绝对频率改为钳制写入并记录钳制后期望值与回读真实值）。
 5. **非崩溃服务恢复 Flag**：`security-service.md:57` 要求设 `SERVICE_CONFIG_FAILURE_ACTIONS_FLAG`，`ServiceInstaller.cs` 未设。
 6. **`MIGRATION_MATRIX.md` 滞后**：`#12 托盘`、`#13 自启`、`#15 单实例无需互斥体` 均与 `100e9c0` 实际代码冲突。
-7. **硬编码文案**：最新口径禁止硬编码，但 `MainViewModel.cs` 仍有 29 处硬编码中文。
+7. **硬编码文案与只做简体中文（违反用户最新口径，非文档冲突）**：原判写 29 处且归为文档冲突；审计基线 `100e9c0` 时 `MainViewModel.cs` 实际约 **35 行**含硬编码中文，且 `SupportedLanguages` 锁死 `["zh-CN"]` 属缺口（界面不处理切换 ≠ 只做简体中文）。注：硬编码缺口已在产品 commit `2d9351d` 修复（桌面文案全量走本地化表，新增 39 键 × 三语），本报告基于 `100e9c0` 保留历史记录。
 8. **其他过时文档**：`sensors/README.md` 仍写 `≥4Hz` 与 WPF `CompositionTarget.Rendering`；`installer.md` 写 `zentwik-next.iss`（实为 `zentwik.iss`）；`ADR-008` 称 LGPL-2.1 合规未落地（实际已补）；`three-plans.md` 残留 `PlanRevision` 描述。
 
 ---

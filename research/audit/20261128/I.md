@@ -28,7 +28,7 @@
 | R-11 | `ADR-008:33-37`：APOB 可选增强，主路径 CPUID + L3 | `CpuTopologyProbe.cs` | `AmdCoreMapResolver.cs:11-33` | 新有旧无 | 静态源码 | `observed` |
 | R-12 | `ADR-008:39-43,76`：声称「分发合规尚未落地」 | `LICENSE` | 已补 `licenses/LGPL-2.1.txt` 与 `THIRD-PARTY-NOTICES.md` | 文档与现实冲突 | 静态源码 | `observed`：文档未更新 |
 | R-13 | `PROJECT_BRIEF.md:23`：第三方插件独立进程隔离 | 无 | 无插件宿主 | 缺 | 静态源码 | `observed` |
-| R-14 | `PROJECT_BRIEF.md:24`：三语运行时切换、主题/强调色/缩放 | `UiSettingsStore.cs` | `SupportedLanguages=["zh-CN"]`；WinForms 无主题/强调色/缩放 | 部分 | 静态源码 | `observed` |
+| R-14 | `PROJECT_BRIEF.md:24`：三语运行时切换、主题/强调色/缩放（最新口径：界面先不处理 i18n 切换 ≠ 只做简体中文；WinForms 无主题/缩放） | `UiSettingsStore.cs` | `SupportedLanguages=["zh-CN"]`；WinForms 无主题/强调色/缩放 | 缺（`SupportedLanguages` 锁 `zh-CN`） | 静态源码 | `observed`：原判「部分」；按最新口径，语言仅开 `zh-CN` 标为**缺口**，主题/缩放按 WinForms 裸控件口径裁剪 |
 | R-15 | `ARCHITECTURE_CONSTRAINTS.md:5-16`：12 条不变量 | 旧缺陷多 | 10 条主体满足；第 8 条插件缺，第 10 条分文件部分 | 部分 | 静态源码 | `observed` |
 | R-16 | `RESEARCH_PLAN.md:3-28`：阶段 0–5 推进 | `7274626` | 核心已落地，WinForms 壳迭代中 | 部分 | 静态源码 | `observed` |
 | R-17 | `PRODUCT_MIGRATION_AND_ROADMAP.md:214-245`：CPU 调校 | `SmuReader`、`IntelTuning` | `AmdSmuTuningProvider`、`IntelMsrTuningProvider`（仅 Fake 测） | 部分 | 静态源码 | `observed` |

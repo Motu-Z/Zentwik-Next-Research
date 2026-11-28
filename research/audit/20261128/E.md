@@ -23,9 +23,9 @@
 | E-08 | `polling-budget.md:22,35,61`：进程计数 2s TTL + Toolhelp 过滤 `ThreadCount==0` | 无系统遥测计数 | `Win32TelemetrySource.CountProcesses:79-90`；`NativeProcessList.Count:15-45` | 新有旧无 | 静态源码 | `observed` |
 | E-09 | `polling-budget.md:22,123`：逐逻辑核占用 `NtQuerySystemInformation` | 无 | `ProcessorLoadReader.Read:37-93`；`ProcessorUsage.Percent:10-20`（首帧 `null`） | 新有旧无 | 静态源码 | `observed`：Desktop UI 未消费展示 |
 | E-10 | `amd-power-limit.md:174`：AMD 传感器走 `AMDFamily17.bin`，10s 失败重试 | 无 | `AmdSensorSource.cs:25,31,284-336`（仅 Family `17h–1Ah`） | 新有旧无 | 静态源码 | `observed` |
-| E-11 | `amd-power-limit.md:176-181`：Tctl SMN `0x00059800` + `Global\Access_PCI` | 无 | `AmdSensorSource.TryReadTemperature:368-399`；`AmdSensorDecoder:16-21` | 新有旧无 | 静态源码 + 9955HX 实测（2026-11-27） | `observed`：Desktop UI 实时卡未展示 |
-| E-12 | `amd-power-limit.md:185-192`：RAPL `0xC0010299` / `0xC001029B` 封装功耗 | 无 | `AmdSensorDecoder:24-39`；`AmdSensorSource.UpdatePackagePower:128-144` | 新有旧无 | 静态源码 + 9955HX 实测（2026-11-27） | `observed`：Desktop UI 实时卡未展示 |
-| E-13 | `amd-power-limit.md:226-245`：APERF/MPERF 逐核均频 | 无 | `AmdSensorSource.SampleClocks:180-275`；`AmdSensorDecoder:49-58` | 新有旧无 | 静态源码 + 9955HX 实测（2026-11-27） | `observed`：Desktop UI 未展示 |
+| E-11 | `amd-power-limit.md:176-181`：Tctl SMN `0x00059800` + `Global\Access_PCI` | 无 | `AmdSensorSource.TryReadTemperature:368-399`；`AmdSensorDecoder:16-21` | 新有旧无 | 静态源码审计 + 引用既有实测记录（非本轮验证） | `observed`：原判混写 `9955HX 实测`；Desktop UI 实时卡未展示 |
+| E-12 | `amd-power-limit.md:185-192`：RAPL `0xC0010299` / `0xC001029B` 封装功耗 | 无 | `AmdSensorDecoder:24-39`；`AmdSensorSource.UpdatePackagePower:128-144` | 新有旧无 | 静态源码审计 + 引用既有实测记录（非本轮验证） | `observed`：原判混写 `9955HX 实测`；Desktop UI 实时卡未展示 |
+| E-13 | `amd-power-limit.md:226-245`：APERF/MPERF 逐核均频 | 无 | `AmdSensorSource.SampleClocks:180-275`；`AmdSensorDecoder:49-58` | 新有旧无 | 静态源码审计 + 引用既有实测记录（非本轮验证） | `observed`：原判混写 `9955HX 实测`；Desktop UI 未展示 |
 | E-14 | `amd-power-limit.md:226`：睡眠核省略，不填 0 MHz | 无 | `AmdSensorDecoder.AverageMegahertz:51-54` 返回 `null`；`SampleClocks:260-263` 跳过 | 新有旧无 | 静态源码 | `observed` |
 | E-15 | `amd-power-limit.md:143-168`：不用 PM 表做遥测 | 未使用 | `AmdSensorSource.cs:12` 仅用 SMN+MSR | 一致 | 静态源码 | `observed` |
 | E-16 | `sensors/README.md:17-30`：Intel 传感器（`0x19C/0x1B1/0x611/0x198`）及 AMD 每核功耗 `0xC001029A` | 无 | 无 | 缺 | 静态源码 | `observed` |

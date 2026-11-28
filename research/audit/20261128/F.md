@@ -16,7 +16,7 @@
 | F-01 | `scenes-arbitration.md:32`：`manual` 手动激活 | 无（`ScenarioService.cs:20-41` 无手动触发） | `Scene.cs:5,57-58`；`SceneEngine.cs:239-256,294-311`；`scenes.activate/deactivate`（UI/CLI 已接线） | 新有旧无 | 静态源码 | `observed` |
 | F-02 | `scenes-arbitration.md:29`：`process` 持续条件 | `ScenarioService.cs:23`；`ScenarioMonitor.cs:216-239` | `Scene.cs:8`；`SceneEngine.cs:490-500` | 一致 | 静态源码 | `observed` |
 | F-03 | `scenes-arbitration.md:25,30,36,67`：`processExited` 边沿触发（首拍不触发） | `ScenarioService.cs:40,235-260`；`ScenarioMonitor.cs:76,253-284` | `Scene.cs:14`；`SceneEngine.cs:41-46,180-233` | 部分实现 | 静态源码 | `observed`：后端与 CLI 已接线，**Desktop UI `MainViewModel.TriggerKinds` 缺失 `ProcessExited`** |
-| F-04 | `scenes-arbitration.md:30,34,67`：`processExited` 保持生效直到停用/禁用/高优抢占 | `ScenarioService.cs:34-38`（不保持不回退） | `SceneEngine.cs:47-48,109,122,139,155-158,301`（`_latched`） | 新有旧无 | 静态源码（2026-11-26 实测记录） | `observed` |
+| F-04 | `scenes-arbitration.md:30,34,67`：`processExited` 保持生效直到停用/禁用/高优抢占 | `ScenarioService.cs:34-38`（不保持不回退） | `SceneEngine.cs:47-48,109,122,139,155-158,301`（`_latched`） | 新有旧无 | 静态源码审计 + 引用既有实测记录（非本轮验证） | `observed`：原判写 `静态源码（2026-11-26 实测记录）` |
 | F-05 | `scenes-arbitration.md:31`：`powerSource` `ac`/`dc` 持续条件 | `PowerStatusWatcher.cs:40-106` | `Win32PowerStatus.cs:5-24`；`SceneEngine.cs:514-524` | 一致 | 静态源码 | `observed` |
 | F-06 | `ScenarioMonitor.cs:15-19`：总闸开关与空闲零占用 | `ScenarioService.cs:205,300-322`；`ScenarioMonitor.cs:84-164` | `Scene.Enabled` 单场景开关；`SchedulingWatcher.cs:146-156`（空闲 20s 轮询） | 部分 | 静态源码 | `observed`：无全局总闸且空闲期仍 20s 轮询 |
 | F-07 | `three-plans.md:12,33-35`：场景引用独立方案最新版 | `ScenarioService.cs:63-75,529-595`（耦合） | `Scene.cs:20-24,48`；`SceneEngine.cs:399-426`；`AgentSession.cs:461` | 一致 | 静态源码 | `observed` |
