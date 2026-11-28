@@ -145,3 +145,5 @@
 ## 9. 明确不做
 
 不改产品代码、不改协议、不跑构建/测试、不碰老版安装、不写产品仓库文件、不把 UI 原型当作当前需求。
+
+已完成 | 提交 SHA：11a175d14cfa72a14768c5c752a8f946aa3ee0e6 | 报告路径：research/handoffs/LEGACY-VS-NEXT-AUDIT-20261128.md、research/audit/20261128/A.md..J.md
